@@ -19,8 +19,39 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   DateTime _date = DateTime.now();
   String _category = 'Food & Dining';
   bool _saved = false;
+<<<<<<< HEAD
   Map<String, String> _errors = {};
 
+=======
+  bool _prefilledFromScan = false;
+  Map<String, String> _errors = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill from OCR scan result if available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = context.read<AppState>().screenArgs;
+      if (args != null && args['fromScan'] == true) {
+        setState(() {
+          _prefilledFromScan = true;
+          if (args['merchant'] != null) {
+            _merchantCtrl.text = args['merchant'] as String;
+          }
+          if (args['amount'] != null) {
+            _amountCtrl.text = args['amount'] as String;
+          }
+          if (args['date'] != null) {
+            try {
+              _date = DateTime.parse(args['date'] as String);
+            } catch (_) {}
+          }
+        });
+      }
+    });
+  }
+
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
   static const Map<String, String> _iconForCategory = {
     'Food & Dining': 'utensils',
     'Transport': 'car',
@@ -96,7 +127,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               const SizedBox(width: 12),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Add Expense', style: GoogleFonts.dmSans(fontSize: 20, fontWeight: FontWeight.w700, color: fgColor)),
+<<<<<<< HEAD
                 Text('Enter expense details manually', style: GoogleFonts.inter(fontSize: 12, color: mutedColor)),
+=======
+                Text(_prefilledFromScan ? 'Review and confirm scanned details' : 'Enter expense details manually', style: GoogleFonts.inter(fontSize: 12, color: mutedColor)),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
               ]),
             ]),
             const SizedBox(height: 24),
@@ -109,7 +144,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Container(
                     width: 64, height: 64,
+<<<<<<< HEAD
                     decoration: BoxDecoration(color: AppColors.secondary.withOpacity(0.1), borderRadius: BorderRadius.circular(18)),
+=======
+                    decoration: BoxDecoration(color: AppColors.secondary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(18)),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
                     child: const Icon(Icons.check, size: 32, color: AppColors.secondary),
                   ),
                   const SizedBox(height: 16),
@@ -118,6 +157,26 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 ]),
               )
             else ...[
+<<<<<<< HEAD
+=======
+              // OCR pre-fill banner
+              if (_prefilledFromScan)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.auto_awesome, size: 16, color: AppColors.secondary),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('Pre-filled from scan — please verify the details below.',
+                        style: GoogleFonts.inter(fontSize: 12, color: AppColors.secondary))),
+                  ]),
+                ),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
               Container(
                 decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderColor)),
                 padding: const EdgeInsets.all(16),
@@ -149,7 +208,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
                       hintText: '0.00',
+<<<<<<< HEAD
                       prefixText: '₺ ',
+=======
+                      prefixText: '${context.read<AppState>().currencySymbol} ',
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
                       errorText: _errors['amount'],
                     ),
                   ),

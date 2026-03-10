@@ -64,7 +64,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Row(children: [
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Expense History', style: GoogleFonts.dmSans(fontSize: 20, fontWeight: FontWeight.w700, color: fgColor)),
+<<<<<<< HEAD
                     Text('${expenses.length} transactions totaling ${formatCurrency(total)}', style: GoogleFonts.inter(fontSize: 12, color: mutedColor)),
+=======
+                    Text('${expenses.length} transactions totaling ${state.formatCurrency(total)}', style: GoogleFonts.inter(fontSize: 12, color: mutedColor)),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
                   ])),
                   OutlinedButton.icon(
                     onPressed: () {},
@@ -111,7 +115,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
+<<<<<<< HEAD
                             color: _sortBy == entry.key ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+=======
+                            color: _sortBy == entry.key ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(entry.value, style: GoogleFonts.inter(fontSize: 12, color: _sortBy == entry.key ? AppColors.primary : fgColor, fontWeight: _sortBy == entry.key ? FontWeight.w500 : FontWeight.normal)),
@@ -137,7 +145,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
             Expanded(
               child: expenses.isEmpty
                 ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+<<<<<<< HEAD
                     Icon(Icons.search_off, size: 40, color: mutedColor.withOpacity(0.5)),
+=======
+                    Icon(Icons.search_off, size: 40, color: mutedColor.withValues(alpha: 0.5)),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
                     const SizedBox(height: 8),
                     Text('No transactions found', style: GoogleFonts.inter(fontSize: 13, color: mutedColor)),
                   ]))
@@ -207,7 +219,11 @@ class _HistoryItem extends StatelessWidget {
       child: Row(children: [
         Container(
           width: 40, height: 40,
+<<<<<<< HEAD
           decoration: BoxDecoration(color: catColor.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+=======
+          decoration: BoxDecoration(color: catColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
           child: Icon(_categoryIcon(expense.icon), size: 18, color: catColor),
         ),
         const SizedBox(width: 12),
@@ -215,7 +231,11 @@ class _HistoryItem extends StatelessWidget {
           Text(expense.merchant, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: fgColor)),
           Text('${formatDate(expense.date)} · ${expense.category}', style: GoogleFonts.inter(fontSize: 11, color: mutedColor)),
         ])),
+<<<<<<< HEAD
         Text('-${formatCurrency(expense.amount)}', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: fgColor)),
+=======
+        Text('-${context.read<AppState>().formatCurrency(expense.amount)}', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: fgColor)),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
       ]),
     );
   }

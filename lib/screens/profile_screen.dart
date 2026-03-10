@@ -14,6 +14,7 @@ class ProfileScreen extends StatelessWidget {
     final bgColor = isDark ? AppColors.darkBackground : AppColors.background;
     final fgColor = isDark ? AppColors.darkForeground : AppColors.foreground;
     final cardColor = isDark ? AppColors.darkCard : AppColors.card;
+<<<<<<< HEAD
     final mutedColor = isDark ? AppColors.darkMutedForeground : AppColors.mutedForeground;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.border;
 
@@ -23,11 +24,53 @@ class ProfileScreen extends StatelessWidget {
       (Icons.shield_outlined, 'Privacy & Security', 'Data protection', 'privacy'),
       (Icons.dark_mode_outlined, 'Appearance', 'Dark mode & themes', 'appearance'),
       (Icons.pie_chart_outline, 'Budget Manager', 'Set spending limits', 'budget'),
+=======
+    final mutedColor =
+        isDark ? AppColors.darkMutedForeground : AppColors.mutedForeground;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.border;
+
+    final menu = [
+      (
+        Icons.credit_card,
+        'Payment Methods',
+        'Manage your cards',
+        'payment-methods'
+      ),
+      (
+        Icons.notifications_outlined,
+        'Notifications',
+        'Alerts & reminders',
+        'notifications'
+      ),
+      (
+        Icons.shield_outlined,
+        'Privacy & Security',
+        'Data protection',
+        'privacy'
+      ),
+      (
+        Icons.dark_mode_outlined,
+        'Appearance',
+        'Dark mode & themes',
+        'appearance'
+      ),
+      (
+        Icons.pie_chart_outline,
+        'Budget Manager',
+        'Set spending limits',
+        'budget'
+      ),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
       (Icons.help_outline, 'Help & Support', 'Get assistance', 'help'),
       (Icons.settings_outlined, 'Settings', 'App preferences', 'settings'),
     ];
 
+<<<<<<< HEAD
     final totalSaved = state.expenses.length > 10 ? (state.expenses.length * 5.9).floor() : 0;
+=======
+    final totalSaved =
+        state.expenses.length > 10 ? (state.expenses.length * 5.9).floor() : 0;
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -37,6 +80,7 @@ class ProfileScreen extends StatelessWidget {
           child: Column(children: [
             // Profile header card
             Container(
+<<<<<<< HEAD
               decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderColor)),
               padding: const EdgeInsets.all(20),
               child: Row(children: [
@@ -64,6 +108,63 @@ class ProfileScreen extends StatelessWidget {
                     width: 36, height: 36,
                     decoration: BoxDecoration(color: isDark ? AppColors.darkMuted : AppColors.muted, borderRadius: BorderRadius.circular(10)),
                     child: Icon(Icons.settings_outlined, size: 18, color: mutedColor),
+=======
+              decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor)),
+              padding: const EdgeInsets.all(20),
+              child: Row(children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16)),
+                  child: state.profileImage.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.network(state.profileImage,
+                              fit: BoxFit.cover))
+                      : const Icon(Icons.person,
+                          size: 32, color: AppColors.primary),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(state.userName,
+                          style: GoogleFonts.dmSans(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: fgColor)),
+                      Text(state.userEmail,
+                          style: GoogleFonts.inter(
+                              fontSize: 13, color: mutedColor)),
+                      const SizedBox(height: 4),
+                      Row(children: [
+                        const Icon(Icons.account_balance_wallet,
+                            size: 12, color: AppColors.secondary),
+                        const SizedBox(width: 4),
+                        Text('Premium Member',
+                            style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.secondary)),
+                      ]),
+                    ])),
+                GestureDetector(
+                  onTap: () => state.setCurrentScreen('editProfile'),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                        color: isDark ? AppColors.darkMuted : AppColors.muted,
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Icon(Icons.settings_outlined,
+                        size: 18, color: mutedColor),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
                   ),
                 ),
               ]),
@@ -71,22 +172,59 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 16),
             // Stats
             Row(children: [
+<<<<<<< HEAD
               _StatCard(value: '${state.expenses.length}', label: 'Receipts', fgColor: fgColor, mutedColor: mutedColor, cardColor: cardColor, borderColor: borderColor),
               const SizedBox(width: 12),
               _StatCard(value: '6', label: 'Months', fgColor: fgColor, mutedColor: mutedColor, cardColor: cardColor, borderColor: borderColor),
               const SizedBox(width: 12),
               _StatCard(value: '₺$totalSaved', label: 'Saved', fgColor: fgColor, mutedColor: mutedColor, cardColor: cardColor, borderColor: borderColor, valueColor: AppColors.secondary),
+=======
+              _StatCard(
+                  value: '${state.expenses.length}',
+                  label: 'Receipts',
+                  fgColor: fgColor,
+                  mutedColor: mutedColor,
+                  cardColor: cardColor,
+                  borderColor: borderColor),
+              const SizedBox(width: 12),
+              _StatCard(
+                  value: '6',
+                  label: 'Months',
+                  fgColor: fgColor,
+                  mutedColor: mutedColor,
+                  cardColor: cardColor,
+                  borderColor: borderColor),
+              const SizedBox(width: 12),
+              _StatCard(
+                  value: context.read<AppState>().formatCurrency(totalSaved.toDouble()),
+                  label: 'Saved',
+                  fgColor: fgColor,
+                  mutedColor: mutedColor,
+                  cardColor: cardColor,
+                  borderColor: borderColor,
+                  valueColor: AppColors.secondary),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
             ]),
             const SizedBox(height: 16),
             // Menu
             Container(
+<<<<<<< HEAD
               decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderColor)),
               child: Column(children: menu.asMap().entries.map((entry) {
+=======
+              decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor)),
+              child: Column(
+                  children: menu.asMap().entries.map((entry) {
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
                 final i = entry.key;
                 final item = entry.value;
                 return Column(children: [
                   if (i > 0) Divider(height: 1, color: borderColor),
                   GestureDetector(
+<<<<<<< HEAD
                     onTap: () => state.setCurrentScreen(item.$4),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -101,6 +239,38 @@ class ProfileScreen extends StatelessWidget {
                           Text(item.$2, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500, color: fgColor)),
                           Text(item.$3, style: GoogleFonts.inter(fontSize: 11, color: mutedColor)),
                         ])),
+=======
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => state.setCurrentScreen(item.$4),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      child: Row(children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppColors.darkMuted
+                                  : AppColors.muted,
+                              borderRadius: BorderRadius.circular(10)),
+                          child: Icon(item.$1, size: 18, color: mutedColor),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text(item.$2,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: fgColor)),
+                              Text(item.$3,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 11, color: mutedColor)),
+                            ])),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
                         Icon(Icons.chevron_right, size: 18, color: mutedColor),
                       ]),
                     ),
@@ -114,17 +284,37 @@ class ProfileScreen extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: state.logout,
+<<<<<<< HEAD
                 icon: const Icon(Icons.logout, size: 18, color: AppColors.destructive),
                 label: Text('Sign Out', style: GoogleFonts.inter(color: AppColors.destructive, fontWeight: FontWeight.w500)),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: AppColors.destructive.withOpacity(0.4)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+=======
+                icon: const Icon(Icons.logout,
+                    size: 18, color: AppColors.destructive),
+                label: Text('Sign Out',
+                    style: GoogleFonts.inter(
+                        color: AppColors.destructive,
+                        fontWeight: FontWeight.w500)),
+                style: OutlinedButton.styleFrom(
+                  side:
+                      BorderSide(color: AppColors.destructive.withValues(alpha: 0.4)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
                 ),
               ),
             ),
             const SizedBox(height: 16),
+<<<<<<< HEAD
             Text('ExpenseIQ v1.0.0', style: GoogleFonts.inter(fontSize: 11, color: mutedColor)),
+=======
+            Text('ExpenseIQ v1.0.0',
+                style: GoogleFonts.inter(fontSize: 11, color: mutedColor)),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
           ]),
         ),
       ),
@@ -140,6 +330,7 @@ class _StatCard extends StatelessWidget {
   final Color cardColor;
   final Color borderColor;
   final Color? valueColor;
+<<<<<<< HEAD
   const _StatCard({required this.value, required this.label, required this.fgColor, required this.mutedColor, required this.cardColor, required this.borderColor, this.valueColor});
 
   @override
@@ -149,6 +340,32 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderColor)),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Text(value, style: GoogleFonts.dmSans(fontSize: 18, fontWeight: FontWeight.w700, color: valueColor ?? fgColor)),
+=======
+  const _StatCard(
+      {required this.value,
+      required this.label,
+      required this.fgColor,
+      required this.mutedColor,
+      required this.cardColor,
+      required this.borderColor,
+      this.valueColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+        child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor)),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Text(value,
+            style: GoogleFonts.dmSans(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: valueColor ?? fgColor)),
+>>>>>>> 69db2b89082359f2961352849b07446b8e5da397
         Text(label, style: GoogleFonts.inter(fontSize: 11, color: mutedColor)),
       ]),
     ));
