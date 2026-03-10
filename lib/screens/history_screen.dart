@@ -64,7 +64,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Row(children: [
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Expense History', style: GoogleFonts.dmSans(fontSize: 20, fontWeight: FontWeight.w700, color: fgColor)),
-                    Text('${expenses.length} transactions totaling ${formatCurrency(total)}', style: GoogleFonts.inter(fontSize: 12, color: mutedColor)),
+                    Text('${expenses.length} transactions totaling ${state.formatCurrency(total)}', style: GoogleFonts.inter(fontSize: 12, color: mutedColor)),
                   ])),
                   OutlinedButton.icon(
                     onPressed: () {},
@@ -215,7 +215,7 @@ class _HistoryItem extends StatelessWidget {
           Text(expense.merchant, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: fgColor)),
           Text('${formatDate(expense.date)} · ${expense.category}', style: GoogleFonts.inter(fontSize: 11, color: mutedColor)),
         ])),
-        Text('-${formatCurrency(expense.amount)}', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: fgColor)),
+        Text('-${context.read<AppState>().formatCurrency(expense.amount)}', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: fgColor)),
       ]),
     );
   }

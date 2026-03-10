@@ -59,14 +59,17 @@ Widget _buildSimpleScreen(BuildContext context, String title, String subtitle,
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final fgColor = isDark ? AppColors.darkForeground : AppColors.foreground;
     final mutedColor =
         isDark ? AppColors.darkMutedForeground : AppColors.mutedForeground;
     final cardColor = isDark ? AppColors.darkCard : AppColors.card;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.border;
+
     return _buildSimpleScreen(context, 'Settings', 'App preferences', [
       Container(
         decoration: BoxDecoration(
@@ -77,31 +80,77 @@ class SettingsScreen extends StatelessWidget {
           _SettingsTile(
               icon: Icons.language,
               label: 'Language',
-              value: 'English',
+              value: state.language,
               fgColor: fgColor,
               mutedColor: mutedColor,
-              borderColor: borderColor),
+              borderColor: borderColor,
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Select Language'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: ['English', 'Turkish'].map((lang) => ListTile(
+                        title: Text(lang),
+                        selected: state.language == lang,
+                        onTap: () {
+                          state.setLanguage(lang);
+                          Navigator.pop(ctx);
+                        },
+                      )).toList(),
+                    ),
+                  ),
+                );
+              }),
           _SettingsTile(
               icon: Icons.currency_exchange,
               label: 'Currency',
-              value: 'TRY (₺)',
+              value: state.currency,
               fgColor: fgColor,
               mutedColor: mutedColor,
-              borderColor: borderColor),
+              borderColor: borderColor,
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Select Currency'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: ['TRY (₺)', 'USD (\$)', 'EUR (€)', 'GBP (£)'].map((curr) => ListTile(
+                        title: Text(curr),
+                        selected: state.currency == curr,
+                        onTap: () {
+                          state.setCurrency(curr);
+                          Navigator.pop(ctx);
+                        },
+                      )).toList(),
+                    ),
+                  ),
+                );
+              }),
           _SettingsTile(
               icon: Icons.notifications_outlined,
               label: 'Push Notifications',
-              value: 'On',
+              value: state.pushNotificationsEnabled ? 'On' : 'Off',
               fgColor: fgColor,
               mutedColor: mutedColor,
-              borderColor: borderColor),
+              borderColor: borderColor,
+              onTap: () {
+                state.setPushNotificationsEnabled(!state.pushNotificationsEnabled);
+              }),
           _SettingsTile(
               icon: Icons.backup_outlined,
               label: 'Backup Data',
               value: '',
               fgColor: fgColor,
               mutedColor: mutedColor,
-              borderColor: borderColor),
+              borderColor: borderColor,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Data backup is not available yet.')),
+                );
+              }),
           _SettingsTile(
               icon: Icons.delete_outline,
               label: 'Clear All Data',
@@ -109,7 +158,29 @@ class SettingsScreen extends StatelessWidget {
               fgColor: fgColor,
               mutedColor: mutedColor,
               borderColor: borderColor,
-              isDestructive: true),
+              isDestructive: true,
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Clear All Data?'),
+                    content: const Text('This will delete all your expenses, settings, and account data. This action cannot be undone.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          state.clearAllData();
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text('Delete', style: TextStyle(color: AppColors.destructive)),
+                      ),
+                    ],
+                  ),
+                );
+              }),
         ]),
       ),
     ]);
@@ -202,10 +273,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
             child: TextField(
               controller: _ctrl,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                prefixText: '₺',
+              decoration: InputDecoration(
+                prefixText: context.read<AppState>().currencySymbol,
                 contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 isDense: true,
               ),
               onSubmitted: (v) => state
@@ -282,6 +353,114 @@ class HelpScreen extends StatelessWidget {
                   ]),
             ),
           )),
+      const SizedBox(height: 24),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            context.read<AppState>().setCurrentScreen('contact_us');
+          },
+          icon: const Icon(Icons.support_agent, size: 18),
+          label: const Text('Contact Us'),
+        ),
+      ),
+    ]);
+  }
+}
+
+class ContactUsScreen extends StatefulWidget {
+  const ContactUsScreen({super.key});
+
+  @override
+  State<ContactUsScreen> createState() => _ContactUsScreenState();
+}
+
+class _ContactUsScreenState extends State<ContactUsScreen> {
+  final _subjectCtrl = TextEditingController();
+  final _messageCtrl = TextEditingController();
+  bool _isSending = false;
+
+  Future<void> _sendMessage() async {
+    if (_subjectCtrl.text.trim().isEmpty || _messageCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill out all fields.')),
+      );
+      return;
+    }
+
+    setState(() => _isSending = true);
+
+    // Simulate network delay
+    await Future.delayed(const Duration(seconds: 1));
+
+    if (!mounted) return;
+    setState(() => _isSending = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Message sent successfully!')),
+    );
+
+    context.read<AppState>().goBack();
+  }
+
+  @override
+  void dispose() {
+    _subjectCtrl.dispose();
+    _messageCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fgColor = isDark ? AppColors.darkForeground : AppColors.foreground;
+    final cardColor = isDark ? AppColors.darkCard : AppColors.card;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.border;
+
+    return _buildSimpleScreen(
+        context, 'Contact Us', 'Send us a message directly', [
+      Container(
+        decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor)),
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Subject',
+              style: GoogleFonts.inter(
+                  fontSize: 13, fontWeight: FontWeight.w500, color: fgColor)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _subjectCtrl,
+            decoration: const InputDecoration(
+                hintText: 'What is this regarding?'),
+          ),
+          const SizedBox(height: 16),
+          Text('Message',
+              style: GoogleFonts.inter(
+                  fontSize: 13, fontWeight: FontWeight.w500, color: fgColor)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _messageCtrl,
+            maxLines: 5,
+            decoration: const InputDecoration(
+                hintText: 'Describe your issue or feedback in detail...'),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 24),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: _isSending ? null : _sendMessage,
+          child: _isSending
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Send Message'),
+        ),
+      ),
     ]);
   }
 }
@@ -432,6 +611,7 @@ class _SettingsTile extends StatelessWidget {
   final Color mutedColor;
   final Color borderColor;
   final bool isDestructive;
+  final VoidCallback? onTap;
 
   const _SettingsTile({
     required this.icon,
@@ -441,32 +621,38 @@ class _SettingsTile extends StatelessWidget {
     required this.mutedColor,
     required this.borderColor,
     this.isDestructive = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(children: [
-          Icon(icon,
-              size: 18,
-              color: isDestructive ? AppColors.destructive : mutedColor),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Text(label,
-                  style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: isDestructive ? AppColors.destructive : fgColor))),
-          if (value.isNotEmpty)
-            Text(value,
-                style: GoogleFonts.inter(fontSize: 12, color: mutedColor)),
-          const SizedBox(width: 4),
-          Icon(Icons.chevron_right, size: 16, color: mutedColor),
-        ]),
-      ),
-      Divider(height: 1, color: borderColor, indent: 16),
-    ]);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Column(children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(children: [
+            Icon(icon,
+                size: 18,
+                color: isDestructive ? AppColors.destructive : mutedColor),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Text(label,
+                    style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: isDestructive ? AppColors.destructive : fgColor))),
+            if (value.isNotEmpty)
+              Text(value,
+                  style: GoogleFonts.inter(fontSize: 12, color: mutedColor)),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right, size: 16, color: mutedColor),
+          ]),
+        ),
+        Divider(height: 1, color: borderColor, indent: 16),
+      ]),
+    );
   }
 }
+

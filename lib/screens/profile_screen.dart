@@ -143,7 +143,7 @@ class ProfileScreen extends StatelessWidget {
                   borderColor: borderColor),
               const SizedBox(width: 12),
               _StatCard(
-                  value: '₺$totalSaved',
+                  value: context.read<AppState>().formatCurrency(totalSaved.toDouble()),
                   label: 'Saved',
                   fgColor: fgColor,
                   mutedColor: mutedColor,

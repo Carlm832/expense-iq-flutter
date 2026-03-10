@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 import '../app_state.dart';
 import '../models.dart';
 import '../theme.dart';
@@ -14,7 +15,62 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  String _timeRange = 'month';
+  String _timeRange = 'month'; // 'week', 'month', 'custom'
+  DateTimeRange? _customRange;
+
+  Future<void> _selectCustomRange() async {
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: isDark
+                ? const ColorScheme.dark(
+                    primary: AppColors.primary,
+                    surface: AppColors.darkCard,
+                    onSurface: AppColors.darkForeground,
+                  )
+                : const ColorScheme.light(
+                    primary: AppColors.primary,
+                    surface: AppColors.card,
+                    onSurface: AppColors.foreground,
+                  ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && picked != _customRange) {
+      setState(() {
+        _customRange = picked;
+        _timeRange = 'custom';
+      });
+    } else if (_timeRange == 'custom' && _customRange == null) {
+      // Revert if cancelled and no previous custom range
+      setState(() => _timeRange = 'month');
+    }
+  }
+
+  List<Expense> _getFilteredExpenses(List<Expense> allExpenses) {
+    final now = DateTime.now();
+    return allExpenses.where((e) {
+      final d = DateTime.parse(e.date);
+      if (_timeRange == 'week') {
+        return now.difference(d).inDays < 7;
+      } else if (_timeRange == 'custom' && _customRange != null) {
+        return d.isAfter(_customRange!.start.subtract(const Duration(days: 1))) &&
+               d.isBefore(_customRange!.end.add(const Duration(days: 1)));
+      } else { // 'month' or default
+        // Get last 6 months logic from existing chart, but let's filter actual data to last 6 mos
+        final sixMonthsAgo = DateTime(now.year, now.month - 5, 1);
+        return d.isAfter(sixMonthsAgo);
+      }
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +84,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final borderColor = isDark ? AppColors.darkBorder : AppColors.border;
     final mutedBg = isDark ? AppColors.darkMuted : AppColors.muted;
 
-    final expenses = state.expenses;
+    final expenses = _getFilteredExpenses(state.expenses);
     final totalSpending = expenses.fold(0.0, (s, e) => s + e.amount);
 
     final Map<String, double> categoryMap = {};
@@ -51,27 +107,39 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final Map<int, double> dayTotals = {};
       for (final e in expenses) {
         final d = DateTime.parse(e.date);
-        final diff = now.difference(d).inDays;
-        if (diff < 7) {
-          dayTotals[d.weekday] = (dayTotals[d.weekday] ?? 0) + e.amount;
-        }
+        dayTotals[d.weekday] = (dayTotals[d.weekday] ?? 0) + e.amount;
       }
       const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       chartData = List.generate(7, (i) => (days[i], dayTotals[i + 1] ?? 0.0));
+    } else if (_timeRange == 'custom' && _customRange != null) {
+        // Group by day if range is < 14 days, else group by month
+        final duration = _customRange!.end.difference(_customRange!.start).inDays;
+        if (duration <= 14) {
+            final Map<String, double> dayTotals = {};
+            for (final e in expenses) {
+                final d = DateTime.parse(e.date);
+                final label = DateFormat('MM/dd').format(d);
+                dayTotals[label] = (dayTotals[label] ?? 0) + e.amount;
+            }
+            // Generate all days in range to ensure continuous axis
+            for (int i = 0; i <= duration; i++) {
+                final d = _customRange!.start.add(Duration(days: i));
+                final label = DateFormat('MM/dd').format(d);
+                chartData.add((label, dayTotals[label] ?? 0.0));
+            }
+        } else {
+             // Group by month
+             final Map<String, double> monthTotals = {};
+             for (final e in expenses) {
+                 final d = DateTime.parse(e.date);
+                 final label = DateFormat('MMM yyyy').format(d);
+                 monthTotals[label] = (monthTotals[label] ?? 0) + e.amount;
+             }
+             chartData = monthTotals.entries.map((e) => (e.key, e.value)).toList();
+        }
     } else {
       const monthNames = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec'
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
       ];
       final Map<int, double> monthTotals = {};
       for (final e in expenses) {
@@ -83,6 +151,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         return (monthNames[m], monthTotals[m] ?? 0.0);
       });
     }
+
+    // Insights Calculations
+    final maxExpense = expenses.isEmpty
+        ? null
+        : expenses.reduce((a, b) => a.amount > b.amount ? a : b);
+    
+    // Most active day (day of week with most expenses over this period)
+    int mostActiveDayIdx = -1;
+    if (expenses.isNotEmpty) {
+      final Map<int, int> countPerDay = {};
+      for(var e in expenses) {
+        final d = DateTime.parse(e.date);
+        countPerDay[d.weekday] = (countPerDay[d.weekday] ?? 0) + 1;
+      }
+      mostActiveDayIdx = countPerDay.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+    }
+    const daysArr = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -119,15 +205,31 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     cardColor: cardColor,
                     fgColor: fgColor,
                     mutedColor: mutedColor),
+                _TimeTab(
+                    label: 'Custom',
+                    isSelected: _timeRange == 'custom',
+                    onTap: _selectCustomRange,
+                    cardColor: cardColor,
+                    fgColor: fgColor,
+                    mutedColor: mutedColor),
               ]),
             ),
+            if (_timeRange == 'custom' && _customRange != null) ...[
+                const SizedBox(height: 8),
+                Center(
+                    child: Text(
+                        '${DateFormat.yMMMd().format(_customRange!.start)} - ${DateFormat.yMMMd().format(_customRange!.end)}',
+                        style: GoogleFonts.inter(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w500),
+                    )
+                ),
+            ],
             const SizedBox(height: 16),
 
             // Stats row
             Row(children: [
               _StatCard(
                   label: 'Total',
-                  value: formatCurrency(totalSpending),
+                  value: state.formatCurrency(totalSpending),
                   isDark: isDark,
                   fgColor: fgColor,
                   mutedColor: mutedColor,
@@ -135,8 +237,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   cardColor: cardColor),
               const SizedBox(width: 8),
               _StatCard(
-                  label: 'Avg/Day',
-                  value: formatCurrency(totalSpending / 28),
+                  label: 'Avg/Item',
+                  value: expenses.isEmpty ? '${state.currencySymbol}0' : state.formatCurrency(totalSpending / expenses.length),
                   isDark: isDark,
                   fgColor: fgColor,
                   mutedColor: mutedColor,
@@ -144,7 +246,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   cardColor: cardColor),
               const SizedBox(width: 8),
               _StatCard(
-                  label: 'Items',
+                  label: 'Count',
                   value: '${expenses.length}',
                   isDark: isDark,
                   fgColor: fgColor,
@@ -174,7 +276,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                   color: fgColor))),
                       Icon(Icons.calendar_today, size: 12, color: mutedColor),
                       const SizedBox(width: 4),
-                      Text(_timeRange == 'week' ? 'This Week' : 'Last 6 Months',
+                      Text(
+                          _timeRange == 'week' 
+                            ? 'This Week' 
+                            : _timeRange == 'custom' 
+                                ? 'Custom Range'
+                                : 'Last 6 Months',
                           style: GoogleFonts.inter(
                               fontSize: 11, color: mutedColor)),
                     ]),
@@ -200,6 +307,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                               if (idx < 0 || idx >= chartData.length) {
                                 return const SizedBox();
                               }
+                              // Hide some labels if there are too many (e.g. custom range)
+                              if (chartData.length > 7 && idx % ((chartData.length ~/ 5) + 1) != 0) {
+                                  return const SizedBox();
+                              }
+
                               return Text(chartData[idx].$1,
                                   style: GoogleFonts.inter(
                                       fontSize: 10, color: mutedColor));
@@ -214,9 +326,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                     BarChartRodData(
                                       toY: chartData[i].$2,
                                       color: AppColors.primary,
-                                      width: 20,
+                                      width: chartData.length > 7 ? 8 : 20,
                                       borderRadius: const BorderRadius.vertical(
-                                          top: Radius.circular(6)),
+                                          top: Radius.circular(4)),
                                     )
                                   ],
                                 )),
@@ -244,8 +356,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     const SizedBox(height: 16),
                     categorySummary.isEmpty
                         ? Center(
-                            child: Text('No data',
-                                style: GoogleFonts.inter(color: mutedColor)))
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Text('No data for this period',
+                                  style: GoogleFonts.inter(color: mutedColor)),
+                            ))
                         : Row(children: [
                             SizedBox(
                               width: 150,
@@ -311,69 +426,57 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Insights',
+                    Text('Detailed Insights',
                         style: GoogleFonts.inter(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: fgColor)),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                          color: AppColors.secondary.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(12)),
-                      child: Row(children: [
-                        const Icon(Icons.trending_down,
-                            size: 16, color: AppColors.secondary),
-                        const SizedBox(width: 12),
-                        Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                              Text('Total expenses tracked',
-                                  style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: fgColor)),
-                              Text(
-                                  'You have ${expenses.length} expenses totaling ${formatCurrency(totalSpending)}.',
-                                  style: GoogleFonts.inter(
-                                      fontSize: 11, color: mutedColor)),
-                            ])),
-                      ]),
-                    ),
+                    const SizedBox(height: 16),
+                    
+                    if (maxExpense != null) ...[
+                        _InsightRow(
+                            icon: Icons.receipt_long,
+                            color: AppColors.secondary,
+                            title: 'Largest Expense',
+                            description: '${maxExpense.merchant} on ${DateFormat('MMM dd').format(DateTime.parse(maxExpense.date))} (${state.formatCurrency(maxExpense.amount)})',
+                            fgColor: fgColor,
+                            mutedColor: mutedColor,
+                        ),
+                        const SizedBox(height: 12),
+                    ],
+
+                    if (mostActiveDayIdx != -1) ...[
+                        _InsightRow(
+                            icon: Icons.calendar_month,
+                            color: AppColors.primary,
+                            title: 'Most Active Day',
+                            description: 'You tend to make the most purchases on ${daysArr[mostActiveDayIdx - 1]}s.',
+                            fgColor: fgColor,
+                            mutedColor: mutedColor,
+                        ),
+                        const SizedBox(height: 12),
+                    ],
+
                     if (categorySummary.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                            color: AppColors.chartAmber.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(12)),
-                        child: Row(children: [
-                          const Icon(Icons.trending_up,
-                              size: 16, color: AppColors.chartAmber),
-                          const SizedBox(width: 12),
-                          Expanded(
-                              child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                Text('Top spending category',
-                                    style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                        color: fgColor)),
-                                Builder(builder: (ctx) {
-                                  final sorted = [
-                                    ...categorySummary
-                                  ]..sort((a, b) => b.value.compareTo(a.value));
-                                  return Text(
-                                      '${sorted[0].name} is your highest category at ${formatCurrency(sorted[0].value)}.',
-                                      style: GoogleFonts.inter(
-                                          fontSize: 11, color: mutedColor));
-                                }),
-                              ])),
-                        ]),
-                      ),
+                      Builder(builder: (ctx) {
+                        final sorted = [...categorySummary]..sort((a, b) => b.value.compareTo(a.value));
+                        return _InsightRow(
+                            icon: Icons.pie_chart,
+                            color: AppColors.chartAmber,
+                            title: 'Top Category',
+                            description: '${sorted[0].name} accounts for ${((sorted[0].value / totalSpending) * 100).toStringAsFixed(1)}% of your spending in this period.',
+                            fgColor: fgColor,
+                            mutedColor: mutedColor,
+                        );
+                      }),
+                    ] else ...[
+                        Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text('Not enough data to generate insights.',
+                                  style: GoogleFonts.inter(fontSize: 12, color: mutedColor)),
+                            ),
+                        )
                     ],
                   ]),
             ),
@@ -382,6 +485,61 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       ),
     );
   }
+}
+
+class _InsightRow extends StatelessWidget {
+    final IconData icon;
+    final Color color;
+    final String title;
+    final String description;
+    final Color fgColor;
+    final Color mutedColor;
+
+    const _InsightRow({
+        required this.icon,
+        required this.color,
+        required this.title,
+        required this.description,
+        required this.fgColor,
+        required this.mutedColor,
+    });
+
+    @override
+    Widget build(BuildContext context) {
+        return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+                Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, size: 16, color: color),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                            Text(title,
+                                style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: fgColor)),
+                            const SizedBox(height: 2),
+                            Text(description,
+                                style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    height: 1.4,
+                                    color: mutedColor)),
+                        ],
+                    ),
+                ),
+            ],
+        );
+    }
 }
 
 class _TimeTab extends StatelessWidget {

@@ -226,10 +226,6 @@ final List<AppNotification> kDefaultNotifications = [
       type: 'warning'),
 ];
 
-String formatCurrency(double amount) {
-  return '₺${amount.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
-}
-
 String formatDate(String dateStr) {
   final date = DateTime.parse(dateStr);
   const months = [

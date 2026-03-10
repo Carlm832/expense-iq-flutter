@@ -149,7 +149,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
                       hintText: '0.00',
-                      prefixText: '₺ ',
+                      prefixText: '${context.read<AppState>().currencySymbol} ',
                       errorText: _errors['amount'],
                     ),
                   ),

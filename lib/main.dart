@@ -72,6 +72,8 @@ class AppRouter extends StatelessWidget {
         child = const PaymentMethodsScreen();
       case 'editProfile':
         child = const EditProfileScreen();
+      case 'contact_us':
+        child = const ContactUsScreen();
       default:
         child = MainScaffold(currentScreen: screen);
     }

@@ -17,7 +17,7 @@ class AppState extends ChangeNotifier {
   List<Expense> _expenses = List.from(kRecentExpenses);
 
   // Notifications
-  final List<AppNotification> _notifications = List.from(kDefaultNotifications);
+  List<AppNotification> _notifications = List.from(kDefaultNotifications);
 
   // Budgets
   double _overallBudget = 0.0;
@@ -31,6 +31,11 @@ class AppState extends ChangeNotifier {
   // Expense detail
   Expense? _selectedExpense;
   bool _showExpenseDetail = false;
+
+  // New Settings Fields
+  String _language = 'English';
+  String _currency = 'TRY (₺)';
+  bool _pushNotificationsEnabled = true;
 
   // Getters
   bool get isLoggedIn => _isLoggedIn;
@@ -48,6 +53,21 @@ class AppState extends ChangeNotifier {
   bool get showExpenseDetail => _showExpenseDetail;
   int get unreadCount => _notifications.where((n) => !n.read).length;
 
+  String get language => _language;
+  String get currency => _currency;
+  bool get pushNotificationsEnabled => _pushNotificationsEnabled;
+
+  // Extract the symbol from "TRY (₺)" -> "₺"
+  String get currencySymbol {
+    final match = RegExp(r'\((.*?)\)').firstMatch(_currency);
+    return match != null ? match.group(1) ?? '₺' : '₺';
+  }
+
+  // Currency formatter
+  String formatCurrency(double amount) {
+    return '$currencySymbol${amount.toStringAsFixed(2).replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
+  }
+
   AppState() {
     _loadFromPrefs();
   }
@@ -60,10 +80,21 @@ class AppState extends ChangeNotifier {
     _profileImage = prefs.getString('profileImage') ?? '';
     _isDarkMode = prefs.getBool('isDarkMode') ?? false;
 
+    // Load Settings
+    _language = prefs.getString('language') ?? 'English';
+    _currency = prefs.getString('currency') ?? 'TRY (₺)';
+    _pushNotificationsEnabled = prefs.getBool('pushNotificationsEnabled') ?? true;
+
     final expensesJson = prefs.getString('expenses');
     if (expensesJson != null) {
       final List<dynamic> decoded = jsonDecode(expensesJson);
       _expenses = decoded.map((e) => Expense.fromJson(e)).toList();
+    }
+
+    final notificationsJson = prefs.getString('notifications');
+    if (notificationsJson != null) {
+      final List<dynamic> decoded = jsonDecode(notificationsJson);
+      _notifications = decoded.map((e) => AppNotification.fromJson(e)).toList();
     }
 
     _overallBudget = prefs.getDouble('overallBudget') ?? 0.0;
@@ -77,6 +108,12 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     prefs.setString(
         'expenses', jsonEncode(_expenses.map((e) => e.toJson()).toList()));
+  }
+
+  Future<void> _saveNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setString(
+        'notifications', jsonEncode(_notifications.map((e) => e.toJson()).toList()));
   }
 
   Future<void> _saveBudget() async {
@@ -153,6 +190,7 @@ class AppState extends ChangeNotifier {
   void addExpense(Expense expense) {
     _expenses = [expense, ..._expenses];
     _saveExpenses();
+    _checkBudgetWarning();
     notifyListeners();
   }
 
@@ -165,13 +203,24 @@ class AppState extends ChangeNotifier {
   void deleteExpense(String id) {
     _expenses = _expenses.where((e) => e.id != id).toList();
     _saveExpenses();
+    _checkBudgetWarning();
     notifyListeners();
   }
 
   void markNotificationRead(String id) {
-    for (var n in _notifications) {
-      if (n.id == id) n.read = true;
+    final idx = _notifications.indexWhere((n) => n.id == id);
+    if (idx != -1) {
+      _notifications[idx].read = true;
+      _saveNotifications();
+      notifyListeners();
     }
+  }
+
+  void markAllNotificationsRead() {
+    for (var n in _notifications) {
+      n.read = true;
+    }
+    _saveNotifications();
     notifyListeners();
   }
 
@@ -187,37 +236,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _checkBudgetWarning() {
-    if (_overallBudget <= 0 || _hasSeenBudgetWarningThisMonth) return;
-
-    final currentMonthExpenses = _expenses.where(
-        (e) => e.date.startsWith(DateTime.now().toString().substring(0, 7)));
-
-    final spentThisMonth =
-        currentMonthExpenses.fold(0.0, (s, e) => s + e.amount);
-
-    if (spentThisMonth >= _overallBudget * 0.9) {
-      _hasSeenBudgetWarningThisMonth = true;
-      _markWarningSeen();
-      _notifications.insert(
-          0,
-          AppNotification(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            title: 'Budget Warning',
-            message:
-                'You have spent ${((spentThisMonth / _overallBudget) * 100).toStringAsFixed(0)}% of your monthly budget.',
-            time: 'Just now',
-            read: false,
-            type: 'warning',
-          ));
-      notifyListeners();
-    }
-  }
-
   void toggleDarkMode() {
     _isDarkMode = !_isDarkMode;
-    SharedPreferences.getInstance()
-        .then((p) => p.setBool('isDarkMode', _isDarkMode));
+    SharedPreferences.getInstance().then((p) => p.setBool('isDarkMode', _isDarkMode));
     notifyListeners();
   }
 
@@ -260,5 +281,76 @@ class AppState extends ChangeNotifier {
   bool isEmailRegistered(String email) {
     return _registeredUsers
         .any((u) => u['email']!.toLowerCase() == email.toLowerCase());
+  }
+
+  // New Settings Setters
+  Future<void> setLanguage(String lang) async {
+    _language = lang;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('language', lang);
+    notifyListeners();
+  }
+
+  Future<void> setCurrency(String curr) async {
+    _currency = curr;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('currency', curr);
+    notifyListeners();
+  }
+
+  Future<void> setPushNotificationsEnabled(bool enabled) async {
+    _pushNotificationsEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('pushNotificationsEnabled', enabled);
+    notifyListeners();
+  }
+
+  Future<void> clearAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+
+    _expenses = [];
+    _notifications = [];
+    _overallBudget = 0.0;
+    
+    _isLoggedIn = false;
+    _userName = '';
+    _userEmail = '';
+    _profileImage = '';
+    
+    _language = 'English';
+    _currency = 'TRY (₺)';
+    _pushNotificationsEnabled = true;
+    _isDarkMode = false;
+    
+    _screenHistory = ['splash'];
+    notifyListeners();
+  }
+
+  void _checkBudgetWarning() {
+    if (_overallBudget <= 0 || _hasSeenBudgetWarningThisMonth) return;
+
+    final currentMonthExpenses = _expenses.where(
+        (e) => e.date.startsWith(DateTime.now().toString().substring(0, 7)));
+
+    final spentThisMonth =
+        currentMonthExpenses.fold(0.0, (s, e) => s + e.amount);
+
+    if (spentThisMonth >= _overallBudget * 0.9) {
+      _markWarningSeen();
+      _notifications.insert(
+          0,
+          AppNotification(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            title: 'Budget Warning',
+            message:
+                'You have spent ${((spentThisMonth / _overallBudget) * 100).toStringAsFixed(0)}% of your monthly budget.',
+            time: 'Just now',
+            read: false,
+            type: 'warning',
+          ));
+      _saveNotifications();
+      notifyListeners();
+    }
   }
 }

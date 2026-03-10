@@ -244,7 +244,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         color: Colors.white
                                             .withValues(alpha: 0.75))),
                                 const SizedBox(height: 4),
-                                Text(formatCurrency(totalSpending),
+                                Text(state.formatCurrency(totalSpending),
                                     style: GoogleFonts.dmSans(
                                         fontSize: 30,
                                         fontWeight: FontWeight.w700,
@@ -365,11 +365,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(height: 6),
                               Row(children: [
-                                Text('${formatCurrency(totalSpending)} spent',
+                                Text('${state.formatCurrency(totalSpending)} spent',
                                     style: GoogleFonts.inter(
                                         fontSize: 10, color: mutedColor)),
                                 const Spacer(),
-                                Text('${formatCurrency(overallBudget)} limit',
+                                Text('${state.formatCurrency(overallBudget)} limit',
                                     style: GoogleFonts.inter(
                                         fontSize: 10, color: mutedColor)),
                               ]),
@@ -443,7 +443,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                                   style: GoogleFonts.inter(
                                                       fontSize: 11,
                                                       color: mutedColor))),
-                                          Text(formatCurrency(cat.value),
+                                          Text(state.formatCurrency(cat.value),
                                               style: GoogleFonts.inter(
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.w600,
@@ -479,7 +479,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   Text('Highest Expense',
                                       style: GoogleFonts.inter(
                                           fontSize: 11, color: mutedColor)),
-                                  Text(formatCurrency(maxExpense),
+                                  Text(state.formatCurrency(maxExpense),
                                       style: GoogleFonts.dmSans(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w700,
@@ -507,7 +507,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   Text('Daily Average',
                                       style: GoogleFonts.inter(
                                           fontSize: 11, color: mutedColor)),
-                                  Text(formatCurrency(dailyAvg),
+                                  Text(state.formatCurrency(dailyAvg),
                                       style: GoogleFonts.dmSans(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w700,
@@ -546,29 +546,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             }),
                       )),
                 ],
-              ),
-            ),
-            // FAB
-            Positioned(
-              bottom: 92,
-              right: 16,
-              child: GestureDetector(
-                onTap: () => state.setCurrentScreen('addExpense'),
-                child: Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4))
-                    ],
-                  ),
-                  child: const Icon(Icons.add, color: Colors.white, size: 24),
-                ),
               ),
             ),
           ],
@@ -625,7 +602,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   mutedColor: mutedColor),
               _DetailRow(
                   label: 'Amount',
-                  value: formatCurrency(e.amount),
+                  value: context.read<AppState>().formatCurrency(e.amount),
                   fgColor: fgColor,
                   mutedColor: mutedColor,
                   isAmount: true),
@@ -765,7 +742,7 @@ class _ExpenseItem extends StatelessWidget {
           Flexible(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text('-${formatCurrency(expense.amount)}',
+              Text('-${context.read<AppState>().formatCurrency(expense.amount)}',
                   style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
