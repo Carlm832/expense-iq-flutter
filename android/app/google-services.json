@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "238458552267",
+    "project_id": "expense-iq-flutter-app",
+    "storage_bucket": "expense-iq-flutter-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:238458552267:android:8e86b2cecf5ba2ef1d004e",
+        "android_client_info": {
+          "package_name": "com.expenseiq.expense_iq_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxMIB3-cXgD6AVnyaPbtPtT7EC8kFgVhY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
