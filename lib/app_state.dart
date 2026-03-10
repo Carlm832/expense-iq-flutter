@@ -32,6 +32,9 @@ class AppState extends ChangeNotifier {
   Expense? _selectedExpense;
   bool _showExpenseDetail = false;
 
+  // Screen navigation args
+  Map<String, dynamic>? _screenArgs;
+
   // New Settings Fields
   String _language = 'English';
   String _currency = 'TRY (₺)';
@@ -43,6 +46,7 @@ class AppState extends ChangeNotifier {
   String get userEmail => _userEmail;
   String get profileImage => _profileImage;
   String get currentScreen => _screenHistory.last;
+  Map<String, dynamic>? get screenArgs => _screenArgs;
   List<Expense> get expenses => _expenses;
   List<AppNotification> get notifications => _notifications;
   double get overallBudget => _overallBudget;
@@ -128,8 +132,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setCurrentScreen(String screen) {
+  void setCurrentScreen(String screen, {Map<String, dynamic>? args}) {
     _screenHistory = [..._screenHistory, screen];
+    _screenArgs = args;
     notifyListeners();
   }
 
