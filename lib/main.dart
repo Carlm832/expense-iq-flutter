@@ -12,6 +12,16 @@ import 'screens/main_scaffold.dart';
 import 'screens/add_expense_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/email_verification_screen.dart';
+import 'screens/forgot_password_screen.dart';
+import 'screens/appearance_screen.dart';
+import 'screens/budget_screen.dart';
+import 'screens/help_screen.dart';
+import 'screens/contact_us_screen.dart';
+import 'screens/privacy_screen.dart';
+import 'screens/payment_methods_screen.dart';
+import 'screens/edit_profile_screen.dart';
+import 'screens/pin_setup_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
@@ -66,6 +76,8 @@ class AppRouter extends StatelessWidget {
       if (screen == 'forgot_password') return const ForgotPasswordScreen();
       return const LoginScreen();
     }
+
+    if (screen == 'email_verification') return const EmailVerificationScreen();
 
     Widget child;
     switch (screen) {

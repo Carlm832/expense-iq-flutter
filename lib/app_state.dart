@@ -122,12 +122,21 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
         _syncDataFromFirestore(user.uid);
 
-        // If PIN is set, lock the app for PIN entry on every fresh start
-        if (_isInitializing && _pin.isNotEmpty) {
-          _isPinLocked = true;
-        } else if (_screenHistory.last == 'login' ||
-            _screenHistory.last == 'register') {
-          _screenHistory = ['dashboard'];
+        // Handle Email Verification for password provider
+        bool isPasswordProvider = user.providerData.any((p) => p.providerId == 'password');
+        if (isPasswordProvider && !user.emailVerified) {
+          if (_screenHistory.last != 'email_verification') {
+            _screenHistory = ['email_verification'];
+          }
+        } else {
+          // If PIN is set, lock the app for PIN entry on every fresh start
+          if (_isInitializing && _pin.isNotEmpty) {
+            _isPinLocked = true;
+          } else if (_screenHistory.last == 'login' ||
+              _screenHistory.last == 'register' ||
+              _screenHistory.last == 'email_verification') {
+            _screenHistory = ['dashboard'];
+          }
         }
       } else {
         _isLoggedIn = false;
@@ -278,6 +287,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       );
       if (credential.user != null) {
         await credential.user!.updateDisplayName(name);
+        await credential.user!.sendEmailVerification();
         // Refresh state
         _userName = name;
         notifyListeners();
@@ -286,6 +296,25 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       // ignore: avoid_print
       print('Registration error: $e');
       rethrow;
+    }
+  }
+
+  Future<void> resendVerificationEmail() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && !user.emailVerified) {
+      await user.sendEmailVerification();
+    }
+  }
+
+  Future<void> checkEmailVerificationStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await user.reload();
+      final freshUser = FirebaseAuth.instance.currentUser;
+      if (freshUser != null && freshUser.emailVerified) {
+        _screenHistory = ['dashboard'];
+        notifyListeners();
+      }
     }
   }
 
