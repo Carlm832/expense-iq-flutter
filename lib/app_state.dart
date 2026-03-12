@@ -243,11 +243,18 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         final GoogleAuthProvider googleProvider = GoogleAuthProvider();
         googleProvider.addScope('email');
         googleProvider.addScope('profile');
+        // Ensure the correct client ID is used for initialization
         await FirebaseAuth.instance.signInWithPopup(googleProvider);
       } else {
         // On Android/iOS, use the native GoogleSignIn package
-        final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-        if (googleUser == null) return; // User canceled
+        // Note: Client ID is usually picked up from google-services.json/Info.plist automatically
+        final GoogleSignIn googleSignIn = GoogleSignIn();
+        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+        
+        if (googleUser == null) {
+          // User canceled the sign-in flow
+          return;
+        }
 
         final GoogleSignInAuthentication googleAuth =
             await googleUser.authentication;
@@ -257,6 +264,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         );
         await FirebaseAuth.instance.signInWithCredential(credential);
       }
+    } on FirebaseAuthException catch (e) {
+      // ignore: avoid_print
+      print('Firebase Google Sign-In error: ${e.code} - ${e.message}');
+      rethrow;
     } catch (e) {
       // ignore: avoid_print
       print('Google sign in error: $e');

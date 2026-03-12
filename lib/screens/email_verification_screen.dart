@@ -131,7 +131,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     TextButton(
                       onPressed: _isResending ? null : () => _handleResend(state),
                       child: _isResending 
-                        ? const CircularProgressIndicator(strokeWidth: 2, size: 20)
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                         : Text('Resend Verification Email', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: AppColors.primary)),
                     ),
                     const SizedBox(height: 24),

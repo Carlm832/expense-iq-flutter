@@ -278,11 +278,28 @@ class _LoginScreenState extends State<LoginScreen> {
             width: double.infinity,
             child: OutlinedButton(
               onPressed: () async {
-                setState(() => _isLoading = true);
+                setState(() {
+                  _isLoading = true;
+                  _errors = {};
+                });
                 try {
                   await state.signInWithGoogle();
+                } on FirebaseAuthException catch (e) {
+                  String msg = 'Google Sign-In failed.';
+                  if (e.code == 'account-exists-with-different-credential') {
+                    msg = 'An account already exists with the same email address but different sign-in credentials.';
+                  } else if (e.code == 'network-request-failed') {
+                    msg = 'Network error. Please check your connection.';
+                  }
+                  setState(() => _errors = {'form': msg});
                 } catch (e) {
-                  setState(() => _errors = {'form': 'Google Sign-In failed.'});
+                  // If it's not a cancellation, show a generic error
+                  // (Cancellation is handled by not throwing/rethrowing in app_state if null)
+                  if (e.toString().contains('canceled')) {
+                    // Do nothing for simple cancellation
+                  } else {
+                    setState(() => _errors = {'form': 'Google Sign-In failed. Please try again.'});
+                  }
                 } finally {
                   if (mounted) setState(() => _isLoading = false);
                 }
