@@ -58,12 +58,6 @@ class ProfileScreen extends StatelessWidget {
     final lang = state.language;
     final menu = [
       (
-        Icons.credit_card,
-        Translations.t('payment_methods', lang),
-        'Manage your cards',
-        'payment-methods'
-      ),
-      (
         Icons.notifications_outlined,
         Translations.t('notifications', lang),
         'Alerts & reminders',

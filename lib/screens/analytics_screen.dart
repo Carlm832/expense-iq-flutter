@@ -95,11 +95,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     final lang = state.language;
     final expenses = _getFilteredExpenses(state.expenses);
-    final totalSpending = expenses.fold(0.0, (s, e) => s + e.amount);
+    final totalSpending = expenses.fold(0.0, (s, e) => s + state.convertToCurrent(e.amount, e.currency));
 
     final Map<String, double> categoryMap = {};
     for (final e in expenses) {
-      categoryMap[e.category] = (categoryMap[e.category] ?? 0) + e.amount;
+      final amount = state.convertToCurrent(e.amount, e.currency);
+      categoryMap[e.category] = (categoryMap[e.category] ?? 0) + amount;
     }
     final categorySummary = kCategories
         .map((cat) => (
@@ -117,7 +118,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final Map<int, double> dayTotals = {};
       for (final e in expenses) {
         final d = DateTime.parse(e.date);
-        dayTotals[d.weekday] = (dayTotals[d.weekday] ?? 0) + e.amount;
+        final amount = state.convertToCurrent(e.amount, e.currency);
+        dayTotals[d.weekday] = (dayTotals[d.weekday] ?? 0) + amount;
       }
       final days = [
         Translations.t('day_mon', lang).substring(0, 3),
@@ -148,7 +150,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         for (final e in expenses) {
           final d = DateTime.parse(e.date);
           final label = DateFormat('MMM yyyy').format(d);
-          monthTotals[label] = (monthTotals[label] ?? 0) + e.amount;
+          final amount = state.convertToCurrent(e.amount, e.currency);
+          monthTotals[label] = (monthTotals[label] ?? 0) + amount;
         }
         chartData = monthTotals.entries.map((e) => (e.key, e.value)).toList();
       }
@@ -170,7 +173,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final Map<int, double> monthTotals = {};
       for (final e in state.expenses) {
         final d = DateTime.parse(e.date);
-        monthTotals[d.month - 1] = (monthTotals[d.month - 1] ?? 0) + e.amount;
+        final amount = state.convertToCurrent(e.amount, e.currency);
+        monthTotals[d.month - 1] = (monthTotals[d.month - 1] ?? 0) + amount;
       }
       chartData = List.generate(6, (i) {
         final m = (now.month - 1 - 5 + i + 12) % 12;

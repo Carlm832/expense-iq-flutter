@@ -215,11 +215,29 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _savePreferences() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await _db.collection('users').doc(user.uid).set({
+        'isDarkMode': _isDarkMode,
+        'language': _language,
+        'currency': _currency,
+        'pushNotificationsEnabled': _pushNotificationsEnabled,
+        'overallBudget': _overallBudget,
+        'appPin': _pin,
+        'isBiometricEnabled': _isBiometricEnabled,
+        'displayName': _userName,
+      }, SetOptions(merge: true));
+    }
+  }
+
   Future<void> _syncDataFromFirestore(String uid) async {
     try {
       final doc = await _db.collection('users').doc(uid).get();
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
+        
+        // Restore Expenses & Budgets
         if (data.containsKey('expenses')) {
           final List<dynamic> exps = data['expenses'];
           _expenses = exps.map((e) => Expense.fromJson(e)).toList();
@@ -228,6 +246,42 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
           final List<dynamic> bdgs = data['budgets'];
           _budgets = bdgs.map((b) => Budget.fromJson(b)).toList();
         }
+
+        // Restore Preferences
+        final prefs = await SharedPreferences.getInstance();
+        if (data.containsKey('isDarkMode')) {
+          _isDarkMode = data['isDarkMode'];
+          await prefs.setBool('isDarkMode', _isDarkMode);
+        }
+        if (data.containsKey('language')) {
+          _language = data['language'];
+          await prefs.setString('language', _language);
+        }
+        if (data.containsKey('currency')) {
+          _currency = data['currency'];
+          await prefs.setString('currency', _currency);
+        }
+        if (data.containsKey('pushNotificationsEnabled')) {
+          _pushNotificationsEnabled = data['pushNotificationsEnabled'];
+          await prefs.setBool('pushNotificationsEnabled', _pushNotificationsEnabled);
+        }
+        if (data.containsKey('overallBudget')) {
+          _overallBudget = (data['overallBudget'] as num).toDouble();
+          await prefs.setDouble('overallBudget', _overallBudget);
+        }
+        if (data.containsKey('appPin')) {
+          _pin = data['appPin'];
+          await prefs.setString('appPin', _pin);
+        }
+        if (data.containsKey('isBiometricEnabled')) {
+          _isBiometricEnabled = data['isBiometricEnabled'];
+          await prefs.setBool('isBiometricEnabled', _isBiometricEnabled);
+        }
+        if (data.containsKey('displayName')) {
+          _userName = data['displayName'];
+          await prefs.setString('userName', _userName);
+        }
+
         notifyListeners();
       }
     } catch (e) {
@@ -468,6 +522,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _isDarkMode = !_isDarkMode;
     SharedPreferences.getInstance()
         .then((p) => p.setBool('isDarkMode', _isDarkMode));
+    _savePreferences();
     notifyListeners();
   }
 
@@ -517,6 +572,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _language = lang;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('language', lang);
+    await _savePreferences();
     notifyListeners();
   }
 
@@ -524,6 +580,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _currency = curr;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('currency', curr);
+    await _savePreferences();
     notifyListeners();
   }
 
@@ -531,6 +588,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _pushNotificationsEnabled = enabled;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('pushNotificationsEnabled', enabled);
+    await _savePreferences();
     notifyListeners();
   }
 
@@ -541,13 +599,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     await prefs.setDouble('overallBudget', amount);
     await prefs.setBool('hasSeenBudgetWarningThisMonth', false);
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await _db
-          .collection('users')
-          .doc(user.uid)
-          .set({'overallBudget': amount}, SetOptions(merge: true));
-    }
+    await _savePreferences();
     notifyListeners();
   }
 
@@ -617,8 +669,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> setPin(String newPin) async {
     _pin = newPin;
     _isPinLocked = false;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('appPin', newPin);
+    await _savePreferences();
     notifyListeners();
   }
 
@@ -626,15 +677,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> clearPin() async {
     _pin = '';
     _isPinLocked = false;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('appPin');
+    await _savePreferences();
     notifyListeners();
   }
 
   Future<void> setBiometricEnabled(bool enabled) async {
     _isBiometricEnabled = enabled;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isBiometricEnabled', enabled);
+    await _savePreferences();
     notifyListeners();
   }
 

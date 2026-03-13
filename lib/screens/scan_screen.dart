@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme.dart';
+import 'camera_screen.dart';
 import '../services/translations.dart';
 import '../app_state.dart';
 import '../services/ocr_service.dart';
@@ -34,7 +35,16 @@ class _ScanScreenState extends State<ScanScreen> {
     });
 
     try {
-      final imageFile = await _ocrService.pickImage(source);
+      XFile? imageFile;
+      if (source == ImageSource.camera) {
+        imageFile = await Navigator.push<XFile>(
+          context,
+          MaterialPageRoute(builder: (_) => const CameraScreen()),
+        );
+      } else {
+        imageFile = await _ocrService.pickImage(source);
+      }
+      
       if (imageFile == null) {
         setState(() {
           _isScanning = false;
