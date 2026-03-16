@@ -633,7 +633,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   mutedColor: mutedColor),
               _DetailRow(
                   label: Translations.t('amount', lang),
-                  value: state.formatCurrency(e.amount),
+                  value: state.formatCurrency(e.amount, e.currency),
                   fgColor: fgColor,
                   mutedColor: mutedColor,
                   isAmount: true),
@@ -787,7 +787,7 @@ class _ExpenseItem extends StatelessWidget {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text(
-                  '-${context.read<AppState>().formatCurrency(expense.amount)}',
+                  '-${context.read<AppState>().formatCurrency(expense.amount, expense.currency)}',
                   style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,

@@ -151,7 +151,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             expense: expenses[idx],
                             isDark: isDark,
                             lang: lang,
-                            formatCurrency: (a) => state.formatCurrency(a),
+                            formatCurrency: (a, c) => state.formatCurrency(a, c),
                           )),
             ),
           ],
@@ -189,7 +189,7 @@ class _HistoryItem extends StatelessWidget {
   final Expense expense;
   final bool isDark;
   final String lang;
-  final String Function(double) formatCurrency;
+  final String Function(double, [String?]) formatCurrency;
 
   const _HistoryItem(
       {required this.expense,
@@ -232,7 +232,7 @@ class _HistoryItem extends StatelessWidget {
           Text(formatDate(expense.date, lang),
               style: GoogleFonts.inter(fontSize: 11, color: mutedColor)),
         ])),
-        Text('-${formatCurrency(expense.amount)}',
+        Text('-${formatCurrency(expense.amount, expense.currency)}',
             style: GoogleFonts.inter(
                 fontSize: 13, fontWeight: FontWeight.w600, color: fgColor)),
       ]),

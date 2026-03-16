@@ -632,8 +632,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  String formatCurrency(double amount) {
-    return formatCurrencyWithSymbol(amount);
+  String formatCurrency(double amount, [String? originalCurrency]) {
+    return formatCurrencyWithSymbol(amount, originalCurrency);
   }
 
   void setSelectedMonth(String month) {
@@ -646,9 +646,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  String formatCurrencyWithSymbol(double amount) {
+  String formatCurrencyWithSymbol(double amount, [String? originalCurrency]) {
     final symbol = _currencyService.getCurrencySymbol(_currency);
-    return '$symbol${amount.toStringAsFixed(2).replaceAllMapped(RegExp(r"(\d)(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}';
+    double convertedAmount = amount;
+    if (originalCurrency != null && originalCurrency.isNotEmpty) {
+      convertedAmount = convertToCurrent(amount, originalCurrency);
+    }
+    return '$symbol${convertedAmount.toStringAsFixed(2).replaceAllMapped(RegExp(r"(\d)(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}';
   }
 
   double convertToCurrent(double amount, String fromCurrency) {

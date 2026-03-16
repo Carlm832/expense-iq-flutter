@@ -70,7 +70,9 @@ class OcrService {
     // Expanded ignore list for common receipt noise
     final ignoreKeywords = [
       'tax', 'vergi', 'fatur', 'tarih', 'saat', 'fis', 'fış', 'no:', 'tel:', 'adres',
-      'mersis', 'ticaret', 'sicil', 'v.d.', 'toplam', 'total', 'kdv', 'matrah'
+      'mersis', 'ticaret', 'sicil', 'v.d.', 'toplam', 'total', 'kdv', 'matrah',
+      'cash', 'card', 'visa', 'mastercard', 'slip', 'pos', 'kredi', 'bank',
+      't.c', 'tc', 'odeme', 'ödenen', 'z rapor', 'z-rapor', 'tutar'
     ];
 
     for (final line in lines.take(10)) { // Check a bit deeper
@@ -101,8 +103,8 @@ class OcrService {
   double? _extractTotal(List<String> lines) {
     // Look for lines containing "total", "amount", "sum" keywords
     final keywords = [
-      'total', 'amount due', 'grand total', 'balance', 'sum', 
-      'genel toplam', 'toplam', 'tutar', 'odenen', 'ödenen'
+      'total', 'amount due', 'amount', 'grand total', 'balance', 'sum', 'due', 'pay',
+      'genel toplam', 'toplam', 'tutar', 'odenen', 'ödenen', 'net', 'yekun', 'kredi karti', 'nakit'
     ];
     
     // Reverse search often works better for totals as they are at the bottom
@@ -126,6 +128,11 @@ class OcrService {
             if (originalIdx + 1 < lines.length) {
               final p2 = _parsePriceAggr(lines[originalIdx + 1]);
               if (p2 != null) return p2;
+            }
+            // Check previous line from original (since it's reversed, meaning the line above the keyword)
+            if (originalIdx - 1 >= 0) {
+               final p3 = _parsePriceAggr(lines[originalIdx - 1]);
+               if (p3 != null) return p3;
             }
           }
         }
@@ -164,11 +171,23 @@ class OcrService {
     cleaned = cleaned.replaceAll('B', '8');
     cleaned = cleaned.replaceAll('A', '4');
 
-    // Look for pattern like 123.45 or 123,45 or 123 . 45
-    final match = RegExp(r'(\d+)[\s.,]+(\d{2})\b').firstMatch(cleaned);
+    // Clean comma/dot anomalies (e.g. 1.234,56 -> 1234.56 or 1,234.56 -> 1234.56)
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ''); // remove all whitespace
+    
+    // Pattern: Digits + dot/comma + 2/3 digits at the end
+    // E.g. 12,34 or 12.34 or 1,234.56
+    final match = RegExp(r'(\d+)[\.,](\d{2,3})$').firstMatch(cleaned);
     if (match != null) {
       final whole = match.group(1)!;
-      final decimal = match.group(2)!;
+      final decimal = match.group(2)!.substring(0, 2); // keep only 2 decimals
+      return double.tryParse('$whole.$decimal');
+    }
+
+    // Secondary look without decimal strictness at the end if the above failed
+    final match2 = RegExp(r'(\d+)[\s.,]+(\d{2})\b').firstMatch(cleaned);
+    if (match2 != null) {
+      final whole = match2.group(1)!;
+      final decimal = match2.group(2)!;
       return double.tryParse('$whole.$decimal');
     }
 
@@ -187,7 +206,24 @@ class OcrService {
       RegExp(r'(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})'), // YYYY-MM-DD
       RegExp(r'(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})'), // DD/MM/YYYY
       RegExp(r'(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2})'), // DD/MM/YY
+      // Word-based month: 12 Jan 2024 or 12-Ocak-2024
+      RegExp(r'(\d{1,2})[\s\.\-]+([a-zA-Z]{3,})[\s\.\-]+(\d{2,4})'), 
     ];
+
+    final monthNames = {
+      'jan': 1, 'ocak': 1,
+      'feb': 2, 'subat': 2, 'şubat': 2,
+      'mar': 3, 'mart': 3,
+      'apr': 4, 'nisan': 4,
+      'may': 5, 'mayis': 5, 'mayıs': 5,
+      'jun': 6, 'haziran': 6,
+      'jul': 7, 'temmuz': 7,
+      'aug': 8, 'agustos': 8, 'ağustos': 8,
+      'sep': 9, 'eylul': 9, 'eylül': 9,
+      'oct': 10, 'ekim': 10,
+      'nov': 11, 'kasim': 11, 'kasım': 11,
+      'dec': 12, 'aralik': 12, 'aralık': 12
+    };
 
     for (final line in lines) {
       for (final pattern in datePatterns) {
@@ -201,6 +237,25 @@ class OcrService {
               if (_isValidDate(year, month, day)) {
                 return '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
               }
+              }
+            } else if (pattern.pattern.contains(r'([a-zA-Z]{3,})')) {
+                // Word-based month handling
+                final dayStr = match.group(1)!;
+                final monthStr = match.group(2)!.toLowerCase();
+                final yearStr = match.group(3)!;
+                
+                int day = int.parse(dayStr);
+                int year = int.parse(yearStr);
+                if (year < 100) year += 2000;
+                
+                int month = 0;
+                monthNames.forEach((key, val) {
+                  if (monthStr.startsWith(key)) month = val;
+                });
+
+                if (month > 0 && _isValidDate(year, month, day)) {
+                  return '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+                }
             } else {
               final a = int.parse(match.group(1)!);
               final b = int.parse(match.group(2)!);
