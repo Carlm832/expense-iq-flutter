@@ -481,15 +481,33 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                   chartData.length,
                                   (i) => FlSpot(i.toDouble(), chartData[i].$2)),
                               isCurved: true,
-                              color: AppColors.primary,
-                              barWidth: 3,
+                              gradient: const LinearGradient(
+                                colors: [
+                                  AppColors.primary,
+                                  AppColors.chartBlue,
+                                  AppColors.chartPurple,
+                                ],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
+                              barWidth: 4,
                               isStrokeCapRound: true,
-                              dotData: const FlDotData(show: false),
+                              dotData: FlDotData(
+                                show: true,
+                                getDotPainter: (spot, percent, barData, index) =>
+                                    FlDotCirclePainter(
+                                  radius: 4,
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                  strokeColor: AppColors.primary,
+                                ),
+                              ),
                               belowBarData: BarAreaData(
                                 show: true,
                                 gradient: LinearGradient(
                                   colors: [
                                     AppColors.primary.withValues(alpha: 0.3),
+                                    AppColors.chartBlue.withValues(alpha: 0.1),
                                     AppColors.primary.withValues(alpha: 0.0),
                                   ],
                                   begin: Alignment.topCenter,

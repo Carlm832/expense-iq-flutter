@@ -65,6 +65,7 @@ class _ScanScreenState extends State<ScanScreen> {
           'merchant': result.merchant,
           'amount': result.amount?.toStringAsFixed(2),
           'date': result.date,
+          'currency': result.currency,
           'fromScan': true,
         });
         context.read<AppState>().setCurrentScreen('addExpense');

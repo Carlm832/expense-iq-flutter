@@ -151,7 +151,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             expense: expenses[idx],
                             isDark: isDark,
                             lang: lang,
-                            formatCurrency: (a, c) => state.formatCurrency(a, c),
+                            formatCurrency: (a, [c]) => state.formatCurrency(a, c),
                           )),
             ),
           ],

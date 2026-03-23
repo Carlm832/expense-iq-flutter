@@ -450,6 +450,14 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
   final _subjectCtrl = TextEditingController();
   final _messageCtrl = TextEditingController();
   bool _isSending = false;
+  String? _selectedSuggestion;
+
+  final List<(String, String)> _suggestions = [
+    ('How to add an expense?', 'Tap the floating "+" button on the dashboard to quickly add any expense.'),
+    ('Currency update frequency?', 'Exchange rates are updated every 24 hours automatically.'),
+    ('Exporting reports?', 'You can export PDF/CSV from the top of the Analytics screen.'),
+    ('Changing language?', 'Go to Profile -> Settings -> Language to switch between English and Turkish.'),
+  ];
 
   Future<void> _sendMessage() async {
     if (_subjectCtrl.text.trim().isEmpty || _messageCtrl.text.trim().isEmpty) {
@@ -495,6 +503,48 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
     final lang = context.read<AppState>().language;
     return _buildSimpleScreen(context, Translations.t('contact_us_title', lang),
         Translations.t('send_message_subtitle', lang), [
+      Text('Suggested Solutions', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: fgColor)),
+      const SizedBox(height: 12),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: _suggestions.map((s) => ChoiceChip(
+          label: Text(s.$1, style: GoogleFonts.inter(fontSize: 11)),
+          selected: _selectedSuggestion == s.$1,
+          onSelected: (selected) {
+            setState(() {
+              _selectedSuggestion = selected ? s.$1 : null;
+              if (selected) {
+                _subjectCtrl.text = s.$1;
+              }
+            });
+          },
+          selectedColor: AppColors.primary.withValues(alpha: 0.1),
+          checkmarkColor: AppColors.primary,
+        )).toList(),
+      ),
+      if (_selectedSuggestion != null) ...[
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.secondary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.secondary.withValues(alpha: 0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Instant Solution:', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondary)),
+              const SizedBox(height: 4),
+              Text(_suggestions.firstWhere((s) => s.$1 == _selectedSuggestion).$2,
+                  style: GoogleFonts.inter(fontSize: 12, color: fgColor)),
+            ],
+          ),
+        ),
+      ],
+      const SizedBox(height: 24),
       Container(
         decoration: BoxDecoration(
             color: cardColor,
@@ -572,7 +622,7 @@ class PrivacyScreen extends StatelessWidget {
             Switch(
               value: state.isBiometricEnabled,
               onChanged: (v) => state.setBiometricEnabled(v),
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
             ),
           ]),
           const Divider(height: 32),

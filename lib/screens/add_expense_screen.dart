@@ -96,22 +96,34 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     if (_editingId != null) {
       // Edit mode: update existing expense, keep the same ID
+      // Retrieve original currency if available, or fall back to user's current currency
+      final originalExpense = state.expenses.firstWhere((e) => e.id == _editingId);
+      final currencyToUse = originalExpense.currency;
+
       final updated = Expense(
         id: _editingId!,
         merchant: _merchantCtrl.text.trim(),
         date: dateStr,
         amount: double.parse(_amountCtrl.text),
+        currency: currencyToUse,
         category: _category,
         icon: _iconForCategory[_category] ?? 'utensils',
       );
       state.editExpense(_editingId!, updated);
     } else {
       // Add mode: create a new expense
+      // Use clean currency code like 'USD' or 'TRY' based on settings
+      String currencyToUse = state.currencyService.cleanCurrencyCode(state.currency);
+      if (_prefilledFromScan && context.read<AppState>().screenArgs?['currency'] != null) {
+        currencyToUse = context.read<AppState>().screenArgs!['currency'] as String;
+      }
+
       final expense = Expense(
         id: 'exp_${DateTime.now().millisecondsSinceEpoch}',
         merchant: _merchantCtrl.text.trim(),
         date: dateStr,
         amount: double.parse(_amountCtrl.text),
+        currency: currencyToUse,
         category: _category,
         icon: _iconForCategory[_category] ?? 'utensils',
       );

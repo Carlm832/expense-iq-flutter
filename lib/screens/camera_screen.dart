@@ -48,7 +48,9 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _takePicture() async {
-    if (_controller == null || !_controller!.value.isInitialized || _isCapturing) {
+    if (_controller == null ||
+        !_controller!.value.isInitialized ||
+        _isCapturing) {
       return;
     }
 
@@ -119,7 +121,13 @@ class _CameraScreenState extends State<CameraScreen> {
                         shape: BoxShape.circle,
                       ),
                       child: _isCapturing
-                          ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.primary)))
+                          ? const Center(
+                              child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 3,
+                                      color: AppColors.primary)))
                           : null,
                     ),
                   ),
@@ -151,10 +159,10 @@ class _CameraScreenState extends State<CameraScreen> {
 
   Widget _buildOverlay() {
     return Container(
-      decoration: ShapeDecoration(
+      decoration: const ShapeDecoration(
         shape: _ViewfinderShape(
           borderRadius: 20,
-          innerSize: const Size(280, 450),
+          innerSize: Size(280, 450),
         ),
       ),
     );
@@ -182,7 +190,8 @@ class _ViewfinderShape extends ShapeBorder {
       height: innerSize.height,
     );
     final innerPath = Path()
-      ..addRRect(RRect.fromRectAndRadius(innerRect, Radius.circular(borderRadius)));
+      ..addRRect(
+          RRect.fromRectAndRadius(innerRect, Radius.circular(borderRadius)));
     return Path.combine(PathOperation.difference, outerPath, innerPath);
   }
 
@@ -197,7 +206,7 @@ class _ViewfinderShape extends ShapeBorder {
       ..color = Colors.white.withValues(alpha: 0.8)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
-    
+
     final innerRect = Rect.fromCenter(
       center: rect.center,
       width: innerSize.width,

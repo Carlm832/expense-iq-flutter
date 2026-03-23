@@ -22,7 +22,7 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 8),
+      duration: const Duration(milliseconds: 2500),
     );
 
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
@@ -36,7 +36,8 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.forward();
 
     // Navigate to the next screen after the animation
-    Future.delayed(const Duration(seconds: 8), () {
+    // Note: AppState handles the 3-second minimum initialization delay.
+    Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
       final state = context.read<AppState>();
       if (state.isLoggedIn) {
@@ -74,8 +75,8 @@ class _SplashScreenState extends State<SplashScreen>
                   children: [
                     Image.asset(
                       'assets/logo.png',
-                      width: 120,
-                      height: 120,
+                      width: 100,
+                      height: 100,
                     ),
                     const SizedBox(height: 24),
                     Text(

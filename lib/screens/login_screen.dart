@@ -114,18 +114,10 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHeader(bool isDark, String lang) {
     return Column(
       children: [
-        Container(
+        Image.asset(
+          'assets/logo.png',
           width: 80,
           height: 80,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2), width: 2),
-          ),
-          child: const Center(
-            child: Icon(Icons.account_balance_wallet_rounded, 
-              color: AppColors.primary, size: 40),
-          ),
         ),
         const SizedBox(height: 24),
         Text('ExpenseIQ',

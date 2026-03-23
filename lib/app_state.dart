@@ -104,6 +104,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     await _loadFromPrefs();
     _initAuthListener();
     await _currencyService.init();
+    // Ensure splash screen is visible for at least 3 seconds
+    await Future.delayed(const Duration(seconds: 3));
     notifyListeners();
   }
 

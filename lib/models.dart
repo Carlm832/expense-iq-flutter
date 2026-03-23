@@ -14,7 +14,7 @@ class Expense {
     required this.merchant,
     required this.date,
     required this.amount,
-    this.currency = 'TRY',
+    required this.currency,
     required this.category,
     required this.icon,
   });
@@ -34,7 +34,7 @@ class Expense {
         merchant: json['merchant'],
         date: json['date'],
         amount: (json['amount'] as num).toDouble(),
-        currency: json['currency'] ?? 'TRY',
+        currency: json['currency'] ?? 'TRY', // fallback for old data without currency
         category: json['category'],
         icon: json['icon'],
       );
@@ -112,6 +112,7 @@ const List<Expense> kDefaultExpenses = [
       merchant: 'Whole Foods Market',
       date: '2026-02-10',
       amount: 67.43,
+      currency: 'USD',
       category: 'Food & Dining',
       icon: 'utensils'),
 ];
