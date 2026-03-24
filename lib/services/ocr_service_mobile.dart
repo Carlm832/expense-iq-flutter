@@ -50,7 +50,8 @@ class OcrService {
           .where((l) => l.isNotEmpty)
           .toList();
 
-      final merchant = _extractMerchant(recognizedText);
+      final receiptType = _detectReceiptType(lines);
+      final merchant = _extractMerchant(recognizedText, receiptType: receiptType);
       final amount = _extractTotal(recognizedText);
       final date = _extractDate(lines);
       final currency = _extractCurrency(lines);
@@ -70,11 +71,30 @@ class OcrService {
     }
   }
 
-  String? _extractMerchant(RecognizedText recognizedText) {
-    // Favor the top-most, likely largest block for the merchant name
+  /// Classify the receipt to guide extraction strategy.
+  /// pos_slip: bank/card terminal receipt (TUTAR keyword, no item breakdown)
+  /// bank_transfer: dekont / EFT receipt (EMV, to be payed, etc.)
+  /// full_receipt: merchant POS roll (TOPLAM, KDV, ARATOPLAM, itemized list)
+  String _detectReceiptType(List<String> lines) {
+    final joined = lines.join(' ').toLowerCase();
+    if (joined.contains('emv') || joined.contains('dekont') ||
+        joined.contains('to be payed') || joined.contains('eft') ||
+        joined.contains('havale') || joined.contains('borç')) {
+      return 'bank_transfer';
+    }
+    // POS slip: has TUTAR/SATIS but NOT a full item list (no KDV line)
+    if ((joined.contains('tutar') || joined.contains('satis')) &&
+        !joined.contains('kdv') && !joined.contains('toplam')) {
+      return 'pos_slip';
+    }
+    return 'full_receipt';
+  }
+
+  String? _extractMerchant(RecognizedText recognizedText, {String receiptType = 'full_receipt'}) {
     if (recognizedText.blocks.isEmpty) return null;
 
-    // Filter and sort blocks by top position (Y coordinate)
+    // For POS slips and bank transfers, the merchant is listed BEFORE the terminal details
+    // For full receipts, favour the very first block
     final topBlocks = recognizedText.blocks.toList()
       ..sort((a, b) => a.boundingBox.top.compareTo(b.boundingBox.top));
 
@@ -193,13 +213,29 @@ class OcrService {
   String suggestCategory(String? merchant) {
     if (merchant == null) return 'Shopping';
     final m = merchant.toLowerCase();
-    
+
+    // Food & Dining
     if (RegExp(r'market|grocery|gida|food|supermarket|migros|bim|a101|sok|carrefour|ikas|goldnuts|trading').hasMatch(m)) return 'Food & Dining';
-    if (RegExp(r'taxi|uber|lyft|bolt|fuel|petrol|benzin|shell|bp|opet|station|transport|airport|donerland|dönerland').hasMatch(m)) return 'Transport';
+    if (RegExp(r'restaur|cafe|coffee|starbucks|burger|pizza|yemek|kebap|doner|döner|lokanta|pastane|fırın|firin').hasMatch(m)) return 'Food & Dining';
+
+    // Transport
+    if (RegExp(r'taxi|uber|lyft|bolt|fuel|petrol|benzin|shell|bp|opet|station|transport|airport|akaryakıt|akaryakit|pompa').hasMatch(m)) return 'Transport';
+
+    // Utilities — expanded for KKTC context
+    if (RegExp(r'turkcell|vodafone|internet|wifi|utility|isik|kib.?tek|kibtek|elektrik|electric|su idaresi|water|telekom|telecom|mobile|tel:|kktc|tele').hasMatch(m)) return 'Utilities';
+    if (RegExp(r'rent|kira|gas|dogalgaz|doğalgaz').hasMatch(m)) return 'Utilities';
+
+    // Health
+    if (RegExp(r'eczane|pharmacy|doktor|doctor|klinik|clinic|hastane|hospital|sağlık|saglik|dis|diş').hasMatch(m)) return 'Health';
+
+    // Entertainment
+    if (RegExp(r'cinema|netflix|spotify|game|steam|theater|sinema|eğlence|eglence').hasMatch(m)) return 'Entertainment';
+
+    // Shopping
     if (RegExp(r'mall|shop|store|clothes|zara|h&m|ikea|amazon|ebay|trendyol|n11').hasMatch(m)) return 'Shopping';
-    if (RegExp(r'cinema|netflix|spotify|game|steam|theater|sinema|eglence').hasMatch(m)) return 'Entertainment';
-    if (RegExp(r'rent|kira|eletric|water|gas|internet|wifi|utility|isik|turkcell|telecom|mobile').hasMatch(m)) return 'Utilities';
-    if (RegExp(r'restaur|cafe|coffee|starbucks|burger|pizza|yemek|kebap').hasMatch(m)) return 'Food & Dining';
+
+    // Education
+    if (RegExp(r'okul|school|univer|kolej|college|kurs|ders|kitap').hasMatch(m)) return 'Education';
 
     return 'Shopping'; // Default
   }

@@ -17,14 +17,15 @@ class ScanScreen extends StatefulWidget {
   State<ScanScreen> createState() => _ScanScreenState();
 }
 
-class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateMixin {
+class _ScanScreenState extends State<ScanScreen>
+    with SingleTickerProviderStateMixin {
   bool _isScanning = false;
   bool _scanFailed = false;
   String _statusMessage = 'Point camera at receipt';
   final _ocrService = OcrService();
 
   late AnimationController _scanAnimationCtrl;
-  
+
   @override
   void initState() {
     super.initState();
@@ -60,7 +61,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
       } else {
         imageFile = await _ocrService.pickImage(source);
       }
-      
+
       if (imageFile == null) {
         _scanAnimationCtrl.stop();
         setState(() {
@@ -84,7 +85,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         });
         await Future.delayed(const Duration(milliseconds: 500));
         if (!mounted) return;
-        
+
         context.read<AppState>().setScreenArgs({
           'merchant': result.merchant,
           'amount': result.amount?.toStringAsFixed(2),
@@ -208,36 +209,36 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
         alignment: Alignment.center,
         children: [
           // Background pulsing icon
-          Opacity(
+          const Opacity(
             opacity: 0.1,
-            child: Icon(Icons.receipt_long, size: 120, color: AppColors.primary),
+            child:
+                Icon(Icons.receipt_long, size: 120, color: AppColors.primary),
           ),
-          
+
           // Animated Scanning Line
           AnimatedBuilder(
             animation: _scanAnimationCtrl,
             builder: (context, child) {
               return Positioned(
-                top: _scanAnimationCtrl.value * 250, // Move down the container (approx height)
+                top: _scanAnimationCtrl.value *
+                    250, // Move down the container (approx height)
                 left: 0,
                 right: 0,
                 child: Container(
                   height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.5),
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      )
-                    ]
-                  ),
+                  decoration:
+                      BoxDecoration(color: AppColors.primary, boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.5),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    )
+                  ]),
                 ),
               );
             },
           ),
-          
+
           // Foreground Status
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -252,14 +253,16 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
               ),
               const SizedBox(height: 20),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor.withValues(alpha: 0.8),
-                  borderRadius: BorderRadius.circular(20)
-                ),
+                    color: Theme.of(context).cardColor.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(20)),
                 child: Text(_statusMessage,
                     style: GoogleFonts.inter(
-                        fontSize: 14, fontWeight: FontWeight.w600, color: fgColor),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: fgColor),
                     textAlign: TextAlign.center),
               ),
             ],
