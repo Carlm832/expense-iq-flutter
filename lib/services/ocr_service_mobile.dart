@@ -341,7 +341,8 @@ class OcrService {
     for (final line in lines) {
       final lower = line.toLowerCase();
       if (lower.contains('toplam') || lower.contains('kasa') || 
-          lower.contains('girne') || lower.contains('caddesi')) {
+          lower.contains('girne') || lower.contains('lefkosa') || 
+          lower.contains('lefkoşa') || lower.contains('caddesi')) {
         return 'TRY';
       }
     }
