@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "expense-iq-flutter-app"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

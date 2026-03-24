@@ -8,6 +8,8 @@ import '../services/translations.dart';
 import '../app_state.dart';
 import '../services/ocr_service.dart';
 
+import 'package:flutter/services.dart';
+
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
 
@@ -15,24 +17,38 @@ class ScanScreen extends StatefulWidget {
   State<ScanScreen> createState() => _ScanScreenState();
 }
 
-class _ScanScreenState extends State<ScanScreen> {
+class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateMixin {
   bool _isScanning = false;
   bool _scanFailed = false;
   String _statusMessage = 'Point camera at receipt';
   final _ocrService = OcrService();
 
+  late AnimationController _scanAnimationCtrl;
+  
+  @override
+  void initState() {
+    super.initState();
+    _scanAnimationCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+  }
+
   @override
   void dispose() {
+    _scanAnimationCtrl.dispose();
     _ocrService.dispose();
     super.dispose();
   }
 
   Future<void> _scan(ImageSource source) async {
+    HapticFeedback.lightImpact();
     setState(() {
       _isScanning = true;
       _scanFailed = false;
       _statusMessage = 'Picking image...';
     });
+    _scanAnimationCtrl.repeat(reverse: true);
 
     try {
       XFile? imageFile;
@@ -46,6 +62,7 @@ class _ScanScreenState extends State<ScanScreen> {
       }
       
       if (imageFile == null) {
+        _scanAnimationCtrl.stop();
         setState(() {
           _isScanning = false;
         });
@@ -61,6 +78,13 @@ class _ScanScreenState extends State<ScanScreen> {
       if (!mounted) return;
 
       if (result.success) {
+        HapticFeedback.mediumImpact();
+        setState(() {
+          _statusMessage = 'Success!';
+        });
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
+        
         context.read<AppState>().setScreenArgs({
           'merchant': result.merchant,
           'amount': result.amount?.toStringAsFixed(2),
@@ -68,8 +92,11 @@ class _ScanScreenState extends State<ScanScreen> {
           'currency': result.currency,
           'fromScan': true,
         });
+        _scanAnimationCtrl.stop();
         context.read<AppState>().setCurrentScreen('addExpense');
       } else {
+        HapticFeedback.heavyImpact();
+        _scanAnimationCtrl.stop();
         setState(() {
           _isScanning = false;
           _scanFailed = true;
@@ -78,6 +105,8 @@ class _ScanScreenState extends State<ScanScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+      HapticFeedback.heavyImpact();
+      _scanAnimationCtrl.stop();
       setState(() {
         _isScanning = false;
         _scanFailed = true;
@@ -174,15 +203,66 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Widget _buildPreviewContent(Color fgColor, Color mutedColor, String lang) {
     if (_isScanning) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      return Stack(
+        alignment: Alignment.center,
         children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 20),
-          Text(_statusMessage,
-              style: GoogleFonts.inter(
-                  fontSize: 14, fontWeight: FontWeight.w500, color: fgColor),
-              textAlign: TextAlign.center),
+          // Background pulsing icon
+          Opacity(
+            opacity: 0.1,
+            child: Icon(Icons.receipt_long, size: 120, color: AppColors.primary),
+          ),
+          
+          // Animated Scanning Line
+          AnimatedBuilder(
+            animation: _scanAnimationCtrl,
+            builder: (context, child) {
+              return Positioned(
+                top: _scanAnimationCtrl.value * 250, // Move down the container (approx height)
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.5),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      )
+                    ]
+                  ),
+                ),
+              );
+            },
+          ),
+          
+          // Foreground Status
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor.withValues(alpha: 0.8),
+                  shape: BoxShape.circle,
+                ),
+                child: const CircularProgressIndicator(strokeWidth: 3),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(20)
+                ),
+                child: Text(_statusMessage,
+                    style: GoogleFonts.inter(
+                        fontSize: 14, fontWeight: FontWeight.w600, color: fgColor),
+                    textAlign: TextAlign.center),
+              ),
+            ],
+          ),
         ],
       );
     }

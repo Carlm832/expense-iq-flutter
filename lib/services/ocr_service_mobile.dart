@@ -95,7 +95,13 @@ class OcrService {
       // Skip lines that are all numbers or symbols
       if (RegExp(r'^[\d\s\-\/\.,\(\):]+$').hasMatch(line)) continue;
       
-      return _capitalize(line);
+      String merchant = _capitalize(line);
+      // Clean up trailing and leading non-word characters often caught by OCR
+      merchant = merchant.replaceAll(RegExp(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$'), '').trim();
+      
+      if (merchant.length < 3) continue;
+
+      return merchant;
     }
     return null;
   }

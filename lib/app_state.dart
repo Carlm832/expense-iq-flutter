@@ -651,15 +651,24 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   String formatCurrencyWithSymbol(double amount, [String? originalCurrency]) {
     final symbol = _currencyService.getCurrencySymbol(_currency);
     double convertedAmount = amount;
+    
+    // Make sure we only convert if the currencies differ 
     if (originalCurrency != null && originalCurrency.isNotEmpty) {
-      convertedAmount = convertToCurrent(amount, originalCurrency);
+      final cleanOriginal = _currencyService.cleanCurrencyCode(originalCurrency);
+      final cleanCurrent = _currencyService.cleanCurrencyCode(_currency);
+      
+      if (cleanOriginal != cleanCurrent) {
+        convertedAmount = convertToCurrent(amount, cleanOriginal);
+      }
     }
     return '$symbol${convertedAmount.toStringAsFixed(2).replaceAllMapped(RegExp(r"(\d)(?=(\d{3})+(?!\d))"), (m) => "${m[1]},")}';
   }
 
   double convertToCurrent(double amount, String fromCurrency) {
+    if (amount == 0) return 0;
     final to = _currencyService.cleanCurrencyCode(_currency);
-    return _currencyService.convert(amount, fromCurrency, to);
+    final from = _currencyService.cleanCurrencyCode(fromCurrency);
+    return _currencyService.convert(amount, from, to);
   }
 
   double getTotalInCurrentCurrency() {
