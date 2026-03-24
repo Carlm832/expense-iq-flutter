@@ -120,42 +120,42 @@ class OcrService {
   }
 
   double? _extractTotal(RecognizedText recognizedText) {
-    final keywords = [
-      'genel toplam', 'toplam', 'tutar', 'odenen', 'ödenen', 'net', 'yekun', 'total', 'grand total', 'sum', 'due', 'pay',
-      'total amount', 'balance due', 'amount due', 'borç', 'toplam net tutar'
+    // High priority: final bill keywords searched first to avoid interim amounts
+    final highPriority = [
+      'to be payed', 'to be paid', 'genel toplam', 'borç', 'toplam net tutar',
+      'emv satis tutari', 'emv satış tutarı'
     ];
-    
-    // Spatial search: Look for numbers to the RIGHT of a total keyword
-    for (final block in recognizedText.blocks) {
-      for (final line in block.lines) {
-        final lower = line.text.toLowerCase();
-        for (final keyword in keywords) {
-          if (lower.contains(keyword)) {
-            // 1. Try to find price in the same line
-            final price = _parsePriceAggr(line.text);
-            if (price != null) return price;
+    // General keywords searched second
+    final general = [
+      'toplam', 'tutar', 'odenen', 'ödenen', 'net', 'yekun',
+      'total', 'grand total', 'sum', 'due', 'pay', 'total amount',
+      'balance due', 'amount due', 'invoices amount', 'amount collected', 'top'
+    ];
 
-            // 2. Look for nearby lines (spatial correlation)
-            final keywordBox = line.boundingBox;
-            for (final otherBlock in recognizedText.blocks) {
-              for (final otherLine in otherBlock.lines) {
-                if (otherLine == line) continue;
-                final otherBox = otherLine.boundingBox;
-                
-                // If the other line is roughly on the same horizontal plane (Y overlaps)
-                // and to the RIGHT of the keyword line
-                final verticalOverlap = (otherBox.top < keywordBox.bottom && otherBox.bottom > keywordBox.top);
-                if (verticalOverlap && otherBox.left > keywordBox.left) {
-                  final spatialPrice = _parsePriceAggr(otherLine.text);
-                  if (spatialPrice != null) return spatialPrice;
-                }
+    for (final keywords in [highPriority, general]) {
+      for (final block in recognizedText.blocks) {
+        for (final line in block.lines) {
+          final lower = line.text.toLowerCase();
+          for (final keyword in keywords) {
+            if (lower.contains(keyword)) {
+              final price = _parsePriceAggr(line.text);
+              if (price != null) return price;
 
-                // 3. Look BELOW the keyword (for table headers like bank receipts)
-                // If it's horizontally aligned (X overlaps) and BELOW
-                final horizontalOverlap = (otherBox.left < keywordBox.right && otherBox.right > keywordBox.left);
-                if (horizontalOverlap && otherBox.top > keywordBox.top && (otherBox.top - keywordBox.bottom) < 50) {
-                  final spatialPrice = _parsePriceAggr(otherLine.text);
-                  if (spatialPrice != null) return spatialPrice;
+              final keywordBox = line.boundingBox;
+              for (final otherBlock in recognizedText.blocks) {
+                for (final otherLine in otherBlock.lines) {
+                  if (otherLine == line) continue;
+                  final otherBox = otherLine.boundingBox;
+                  final verticalOverlap = (otherBox.top < keywordBox.bottom && otherBox.bottom > keywordBox.top);
+                  if (verticalOverlap && otherBox.left > keywordBox.left) {
+                    final spatialPrice = _parsePriceAggr(otherLine.text);
+                    if (spatialPrice != null) return spatialPrice;
+                  }
+                  final horizontalOverlap = (otherBox.left < keywordBox.right && otherBox.right > keywordBox.left);
+                  if (horizontalOverlap && otherBox.top > keywordBox.top && (otherBox.top - keywordBox.bottom) < 50) {
+                    final spatialPrice = _parsePriceAggr(otherLine.text);
+                    if (spatialPrice != null) return spatialPrice;
+                  }
                 }
               }
             }
@@ -164,11 +164,12 @@ class OcrService {
       }
     }
 
-    // Fallback: search by keywords in raw text lines (legacy method)
+    // Fallback: search by keywords in raw text lines
+    final allKeywords = [...highPriority, ...general];
     final lines = recognizedText.text.split('\n');
     for (final line in lines.reversed) {
       final lower = line.toLowerCase();
-      for (final keyword in keywords) {
+      for (final keyword in allKeywords) {
         if (lower.contains(keyword)) {
           final p = _parsePriceAggr(line);
           if (p != null) return p;
@@ -193,11 +194,11 @@ class OcrService {
     if (merchant == null) return 'Shopping';
     final m = merchant.toLowerCase();
     
-    if (RegExp(r'market|grocery|gida|food|supermarket|migros|bim|a101|sok|carrefour').hasMatch(m)) return 'Food & Dining';
-    if (RegExp(r'taxi|uber|lyft|bolt|fuel|petrol|benzin|shell|bp|opet|station|transport|airport').hasMatch(m)) return 'Transport';
+    if (RegExp(r'market|grocery|gida|food|supermarket|migros|bim|a101|sok|carrefour|ikas|goldnuts|trading').hasMatch(m)) return 'Food & Dining';
+    if (RegExp(r'taxi|uber|lyft|bolt|fuel|petrol|benzin|shell|bp|opet|station|transport|airport|donerland|dönerland').hasMatch(m)) return 'Transport';
     if (RegExp(r'mall|shop|store|clothes|zara|h&m|ikea|amazon|ebay|trendyol|n11').hasMatch(m)) return 'Shopping';
     if (RegExp(r'cinema|netflix|spotify|game|steam|theater|sinema|eglence').hasMatch(m)) return 'Entertainment';
-    if (RegExp(r'rent|kira|eletric|water|gas|internet|wifi|utility|isik').hasMatch(m)) return 'Utilities';
+    if (RegExp(r'rent|kira|eletric|water|gas|internet|wifi|utility|isik|turkcell|telecom|mobile').hasMatch(m)) return 'Utilities';
     if (RegExp(r'restaur|cafe|coffee|starbucks|burger|pizza|yemek|kebap').hasMatch(m)) return 'Food & Dining';
 
     return 'Shopping'; // Default
@@ -262,6 +263,8 @@ class OcrService {
       String decimalPart = cleaned.substring(lastSeparatorIdx + 1).replaceAll(RegExp(r'\D'), '');
       if (decimalPart.length > 2) decimalPart = decimalPart.substring(0, 2);
       if (decimalPart.isEmpty) decimalPart = '00';
+      // Sanity check: whole part should not be more than 7 digits (max price ~9,999,999)
+      if (wholePart.length > 7) return null;
       
       return double.tryParse('$wholePart.$decimalPart');
     }

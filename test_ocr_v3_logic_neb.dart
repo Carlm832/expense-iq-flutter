@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 
 // Mock classes to simulate ML Kit structure without dart:ui
 class MockRect {

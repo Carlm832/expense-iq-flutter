@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 // Verification of the OCR logic with Batch 2 receipts
 
 double? parsePrice(String line) {
