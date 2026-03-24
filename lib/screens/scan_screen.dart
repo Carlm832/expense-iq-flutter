@@ -90,6 +90,7 @@ class _ScanScreenState extends State<ScanScreen> with SingleTickerProviderStateM
           'amount': result.amount?.toStringAsFixed(2),
           'date': result.date,
           'currency': result.currency,
+          'category': result.category,
           'fromScan': true,
         });
         _scanAnimationCtrl.stop();

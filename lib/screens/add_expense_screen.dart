@@ -54,6 +54,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           if (args['amount'] != null) {
             _amountCtrl.text = args['amount'] as String;
           }
+          if (args['category'] != null) {
+            _category = args['category'] as String;
+          }
           if (args['date'] != null) {
             try {
               _date = DateTime.parse(args['date'] as String);

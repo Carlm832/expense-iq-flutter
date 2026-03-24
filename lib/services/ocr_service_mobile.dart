@@ -7,6 +7,7 @@ class OcrResult {
   final double? amount;
   final String? date; // ISO format YYYY-MM-DD
   final String? currency;
+  final String? category;
   final String rawText;
   final bool success;
 
@@ -15,6 +16,7 @@ class OcrResult {
     this.amount,
     this.date,
     this.currency,
+    this.category,
     required this.rawText,
     required this.success,
   });
@@ -48,16 +50,18 @@ class OcrService {
           .where((l) => l.isNotEmpty)
           .toList();
 
-      final merchant = _extractMerchant(lines);
-      final amount = _extractTotal(lines);
+      final merchant = _extractMerchant(recognizedText);
+      final amount = _extractTotal(recognizedText);
       final date = _extractDate(lines);
       final currency = _extractCurrency(lines);
+      final category = suggestCategory(merchant);
 
       return OcrResult(
         merchant: merchant,
         amount: amount,
         date: date,
         currency: currency,
+        category: category,
         rawText: rawText,
         success: merchant != null || amount != null,
       );
@@ -66,8 +70,14 @@ class OcrService {
     }
   }
 
-  String? _extractMerchant(List<String> lines) {
-    // Expanded ignore list for common receipt noise
+  String? _extractMerchant(RecognizedText recognizedText) {
+    // Favor the top-most, likely largest block for the merchant name
+    if (recognizedText.blocks.isEmpty) return null;
+
+    // Filter and sort blocks by top position (Y coordinate)
+    final topBlocks = recognizedText.blocks.toList()
+      ..sort((a, b) => a.boundingBox.top.compareTo(b.boundingBox.top));
+
     final ignoreKeywords = [
       'tax', 'vergi', 'fatur', 'tarih', 'saat', 'fis', 'fış', 'no:', 'tel:', 'adres',
       'mersis', 'ticaret', 'sicil', 'v.d.', 'toplam', 'total', 'kdv', 'matrah',
@@ -75,88 +85,113 @@ class OcrService {
       't.c', 'tc', 'odeme', 'ödenen', 'z rapor', 'z-rapor', 'tutar', 'vkn', 'mkn'
     ];
 
-    for (final line in lines.take(10)) { // Check a bit deeper
-      final lower = line.toLowerCase();
-      if (_isPrice(line)) continue;
-      if (_isDate(line)) continue;
-      if (line.length < 3) continue;
-      
-      bool shouldIgnore = false;
-      for (final keyword in ignoreKeywords) {
-        if (lower.contains(keyword)) {
-          shouldIgnore = true;
-          break;
+    // Check the first 3 blocks primarily
+    for (final block in topBlocks.take(5)) {
+      for (final line in block.lines) {
+        final text = line.text.trim();
+        final lower = text.toLowerCase();
+        
+        if (text.length < 3) continue;
+        if (_isPrice(text)) continue;
+        if (_isDate(text)) continue;
+        
+        bool shouldIgnore = false;
+        for (final keyword in ignoreKeywords) {
+          if (lower.contains(keyword)) {
+            shouldIgnore = true;
+            break;
+          }
         }
+        if (shouldIgnore) continue;
+
+        // Skip lines that look like addresses or random numeric identifiers
+        if (RegExp(r'\d{3,}.*\w').hasMatch(text)) continue;
+        if (RegExp(r'^[\d\s\-\/\.,\(\):]+$').hasMatch(text)) continue;
+
+        String merchant = _capitalize(text);
+        // Clean up noise
+        merchant = merchant.replaceAll(RegExp(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$'), '').trim();
+        
+        if (merchant.length >= 3) return merchant;
       }
-      if (shouldIgnore) continue;
-
-      // Skip lines that look like addresses (contains numbers followed by letters frequently)
-      if (RegExp(r'\d{3,}.*\w').hasMatch(line)) continue;
-      // Skip lines that are all numbers or symbols
-      if (RegExp(r'^[\d\s\-\/\.,\(\):]+$').hasMatch(line)) continue;
-      
-      String merchant = _capitalize(line);
-      // Clean up trailing and leading non-word characters often caught by OCR
-      merchant = merchant.replaceAll(RegExp(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$'), '').trim();
-      
-      if (merchant.length < 3) continue;
-
-      return merchant;
     }
     return null;
   }
 
-  double? _extractTotal(List<String> lines) {
-    // Look for lines containing "total", "amount", "sum" keywords
+  double? _extractTotal(RecognizedText recognizedText) {
     final keywords = [
-      'genel toplam', 'toplam', 'tutar', 'odenen', 'ödenen', 'net', 'yekun', 'kredi karti', 'nakit',
-      'genel top', 'top.', 'toptutar', 'ödemen', 'total', 'amount due', 'amount', 'grand total', 'balance', 'sum', 'due', 'pay',
-      'borç', 'toplam net tutar'
+      'genel toplam', 'toplam', 'tutar', 'odenen', 'ödenen', 'net', 'yekun', 'total', 'grand total', 'sum', 'due', 'pay',
+      'total amount', 'balance due', 'amount due'
     ];
     
-    // Reverse search often works better for totals as they are at the bottom
-    for (final line in lines.reversed) {
-      final lower = line.toLowerCase();
-      for (final keyword in keywords) {
-        if (lower.contains(keyword)) {
-          final price = _parsePrice(line);
-          if (price != null) return price;
-          
-          // If the keyword line doesn't have the price, check the NEXT line in the original order 
-          // (which is the PREVIOUS line in this reversed loop)
-          // But wait, actually check the lines around it in the original list
-          final originalIdx = lines.indexOf(line);
-          if (originalIdx != -1) {
-            // Check current line again with more aggressive parsing
-            final p1 = _parsePriceAggr(line);
-            if (p1 != null) return p1;
+    // Spatial search: Look for numbers to the RIGHT of a total keyword
+    for (final block in recognizedText.blocks) {
+      for (final line in block.lines) {
+        final lower = line.text.toLowerCase();
+        for (final keyword in keywords) {
+          if (lower.contains(keyword)) {
+            // 1. Try to find price in the same line
+            final price = _parsePriceAggr(line.text);
+            if (price != null) return price;
 
-            // Check next line
-            if (originalIdx + 1 < lines.length) {
-              final p2 = _parsePriceAggr(lines[originalIdx + 1]);
-              if (p2 != null) return p2;
-            }
-            // Check previous line from original (since it's reversed, meaning the line above the keyword)
-            if (originalIdx - 1 >= 0) {
-               final p3 = _parsePriceAggr(lines[originalIdx - 1]);
-               if (p3 != null) return p3;
+            // 2. Look for nearby lines (spatial correlation)
+            final keywordBox = line.boundingBox;
+            for (final otherBlock in recognizedText.blocks) {
+              for (final otherLine in otherBlock.lines) {
+                if (otherLine == line) continue;
+                final otherBox = otherLine.boundingBox;
+                
+                // If the other line is roughly on the same horizontal plane (Y overlaps)
+                // and to the RIGHT of the keyword line
+                final verticalOverlap = (otherBox.top < keywordBox.bottom && otherBox.bottom > keywordBox.top);
+                if (verticalOverlap && otherBox.left > keywordBox.left) {
+                  final spatialPrice = _parsePriceAggr(otherLine.text);
+                  if (spatialPrice != null) return spatialPrice;
+                }
+              }
             }
           }
         }
       }
     }
 
-    // Fallback: find the largest price value on the receipt (likely the total)
+    // Fallback: search by keywords in raw text lines (legacy method)
+    final lines = recognizedText.text.split('\n');
+    for (final line in lines.reversed) {
+      final lower = line.toLowerCase();
+      for (final keyword in keywords) {
+        if (lower.contains(keyword)) {
+          final p = _parsePriceAggr(line);
+          if (p != null) return p;
+        }
+      }
+    }
+
+    // Ultimate fallback: find the largest price value
     double? largest;
-    for (final line in lines) {
-      final price = _parsePriceAggr(line);
-      if (price != null && price > 0 && price < 1000000) { // Sanity check
-        if (largest == null || price > largest) {
-          largest = price;
+    for (final block in recognizedText.blocks) {
+      for (final line in block.lines) {
+        final price = _parsePriceAggr(line.text);
+        if (price != null && price > 0 && price < 1000000) {
+          if (largest == null || price > largest) largest = price;
         }
       }
     }
     return largest;
+  }
+
+  String suggestCategory(String? merchant) {
+    if (merchant == null) return 'Shopping';
+    final m = merchant.toLowerCase();
+    
+    if (RegExp(r'market|grocery|gida|food|supermarket|migros|bim|a101|sok|carrefour').hasMatch(m)) return 'Food & Dining';
+    if (RegExp(r'taxi|uber|lyft|bolt|fuel|petrol|benzin|shell|bp|opet|station|transport|airport').hasMatch(m)) return 'Transport';
+    if (RegExp(r'mall|shop|store|clothes|zara|h&m|ikea|amazon|ebay|trendyol|n11').hasMatch(m)) return 'Shopping';
+    if (RegExp(r'cinema|netflix|spotify|game|steam|theater|sinema|eglence').hasMatch(m)) return 'Entertainment';
+    if (RegExp(r'rent|kira|eletric|water|gas|internet|wifi|utility|isik').hasMatch(m)) return 'Utilities';
+    if (RegExp(r'restaur|cafe|coffee|starbucks|burger|pizza|yemek|kebap').hasMatch(m)) return 'Food & Dining';
+
+    return 'Shopping'; // Default
   }
 
   double? _parsePrice(String line) {
