@@ -104,7 +104,8 @@ class OcrService {
     // Look for lines containing "total", "amount", "sum" keywords
     final keywords = [
       'genel toplam', 'toplam', 'tutar', 'odenen', 'ödenen', 'net', 'yekun', 'kredi karti', 'nakit',
-      'genel top', 'top.', 'toptutar', 'ödemen', 'total', 'amount due', 'amount', 'grand total', 'balance', 'sum', 'due', 'pay'
+      'genel top', 'top.', 'toptutar', 'ödemen', 'total', 'amount due', 'amount', 'grand total', 'balance', 'sum', 'due', 'pay',
+      'borç', 'toplam net tutar'
     ];
     
     // Reverse search often works better for totals as they are at the bottom
@@ -153,10 +154,24 @@ class OcrService {
   }
 
   double? _parsePrice(String line) {
-    // Standard price regex
-    final match = RegExp(r'[\$€£₺]?\s*(\d{1,6}[.,]\d{2})\b').firstMatch(line);
+    // Improved price regex to handle optional thousands separators
+    // Matches 1.030,00 or 1,234.56 or 600,00
+    final match = RegExp(r'(\d{1,3}([.,]\d{3})*[.,]\d{2})\b').firstMatch(line);
     if (match == null) return null;
-    final raw = match.group(1)!.replaceAll(',', '.');
+    
+    String raw = match.group(1)!;
+    // If it has both . and , the last one is the decimal
+    final lastDot = raw.lastIndexOf('.');
+    final lastComma = raw.lastIndexOf(',');
+    
+    if (lastDot > lastComma) {
+      // . is decimal, remove ,
+      raw = raw.replaceAll(',', '').replaceFirst('.', '.', lastDot);
+    } else if (lastComma > lastDot) {
+      // , is decimal, remove .
+      raw = raw.replaceAll('.', '').replaceFirst(',', '.');
+    }
+    
     return double.tryParse(raw);
   }
 
@@ -302,10 +317,27 @@ class OcrService {
 
   String? _extractCurrency(List<String> lines) {
     for (final line in lines) {
+      final lower = line.toLowerCase();
       if (line.contains('\$')) return 'USD';
       if (line.contains('€')) return 'EUR';
       if (line.contains('£')) return 'GBP';
       if (line.contains('₺') || line.contains('TL')) return 'TRY';
+      
+      // Explicit labels
+      if (lower.contains('para cinsi')) {
+        if (line.contains('EUR') || line.contains('Avro') || line.contains('Euro')) return 'EUR';
+        if (line.contains('USD') || line.contains('Dolar')) return 'USD';
+        if (line.contains('TL') || line.contains('TRY')) return 'TRY';
+      }
+    }
+    
+    // Inference from keywords
+    for (final line in lines) {
+      final lower = line.toLowerCase();
+      if (lower.contains('toplam') || lower.contains('kasa') || 
+          lower.contains('girne') || lower.contains('caddesi')) {
+        return 'TRY';
+      }
     }
     return null;
   }
