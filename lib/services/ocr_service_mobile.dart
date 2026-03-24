@@ -72,7 +72,7 @@ class OcrService {
       'tax', 'vergi', 'fatur', 'tarih', 'saat', 'fis', 'fış', 'no:', 'tel:', 'adres',
       'mersis', 'ticaret', 'sicil', 'v.d.', 'toplam', 'total', 'kdv', 'matrah',
       'cash', 'card', 'visa', 'mastercard', 'slip', 'pos', 'kredi', 'bank',
-      't.c', 'tc', 'odeme', 'ödenen', 'z rapor', 'z-rapor', 'tutar'
+      't.c', 'tc', 'odeme', 'ödenen', 'z rapor', 'z-rapor', 'tutar', 'vkn', 'mkn'
     ];
 
     for (final line in lines.take(10)) { // Check a bit deeper
@@ -109,8 +109,9 @@ class OcrService {
   double? _extractTotal(List<String> lines) {
     // Look for lines containing "total", "amount", "sum" keywords
     final keywords = [
-      'total', 'amount due', 'amount', 'grand total', 'balance', 'sum', 'due', 'pay',
-      'genel toplam', 'toplam', 'tutar', 'odenen', 'ödenen', 'net', 'yekun', 'kredi karti', 'nakit'
+      'genel toplam', 'toplam', 'tutar', 'odenen', 'ödenen', 'net', 'yekun', 'kredi karti', 'nakit',
+      'genel top', 'top.', 'toptutar', 'ödemen', 'total', 'amount due', 'amount', 'grand total', 'balance', 'sum', 'due', 'pay',
+      'borç', 'toplam net tutar'
     ];
     
     // Reverse search often works better for totals as they are at the bottom
@@ -159,17 +160,36 @@ class OcrService {
   }
 
   double? _parsePrice(String line) {
-    // Standard price regex
-    final match = RegExp(r'[\$€£₺]?\s*(\d{1,6}[.,]\d{2})\b').firstMatch(line);
+    // Improved price regex to handle optional thousands separators
+    // Matches 1.030,00 or 1,234.56 or 600,00
+    final match = RegExp(r'(\d{1,3}([.,]\d{3})*[.,]\d{2})\b').firstMatch(line);
     if (match == null) return null;
-    final raw = match.group(1)!.replaceAll(',', '.');
+    
+    String raw = match.group(1)!;
+    // If it has both . and , the last one is the decimal
+    final lastDot = raw.lastIndexOf('.');
+    final lastComma = raw.lastIndexOf(',');
+    
+    if (lastDot > lastComma) {
+      // . is decimal, remove ,
+      raw = raw.replaceAll(',', '').replaceFirst('.', '.', lastDot);
+    } else if (lastComma > lastDot) {
+      // , is decimal, remove .
+      raw = raw.replaceAll('.', '').replaceFirst(',', '.');
+    }
+    
     return double.tryParse(raw);
   }
 
   double? _parsePriceAggr(String line) {
     // More aggressive price parsing with digit correction
     // Clean common OCR errors in what should be a price
-    String cleaned = line.toUpperCase();
+    String cleaned = line.toUpperCase().trim();
+    
+    // Remove currency symbols and common noise
+    cleaned = cleaned.replaceAll(RegExp(r'[\$€£₺]|TL|TRY'), '');
+    
+    // OCR character correction
     cleaned = cleaned.replaceAll('S', '5');
     cleaned = cleaned.replaceAll('O', '0');
     cleaned = cleaned.replaceAll('L', '1');
@@ -177,30 +197,28 @@ class OcrService {
     cleaned = cleaned.replaceAll('B', '8');
     cleaned = cleaned.replaceAll('A', '4');
 
-    // Clean comma/dot anomalies (e.g. 1.234,56 -> 1234.56 or 1,234.56 -> 1234.56)
-    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ''); // remove all whitespace
-    
-    // Pattern: Digits + dot/comma + 2/3 digits at the end
-    // E.g. 12,34 or 12.34 or 1,234.56
-    final match = RegExp(r'(\d+)[\.,](\d{2,3})$').firstMatch(cleaned);
-    if (match != null) {
-      final whole = match.group(1)!;
-      final decimal = match.group(2)!.substring(0, 2); // keep only 2 decimals
-      return double.tryParse('$whole.$decimal');
+    // Handle thousands separators (e.g. 1.234,56 -> 1234,56)
+    // In Turkey, dot is often thousands and comma is decimal, but OCR mixes them up.
+    // If we see both a dot and a comma, the LAST one is almost certainly the decimal.
+    final lastSeparatorIdx = cleaned.lastIndexOf(RegExp(r'[\.,]'));
+    if (lastSeparatorIdx != -1) {
+      String wholePart = cleaned.substring(0, lastSeparatorIdx).replaceAll(RegExp(r'[\.,\s]'), '');
+      String decimalPart = cleaned.substring(lastSeparatorIdx + 1).replaceAll(RegExp(r'\D'), '');
+      if (decimalPart.length > 2) decimalPart = decimalPart.substring(0, 2);
+      if (decimalPart.isEmpty) decimalPart = '00';
+      
+      return double.tryParse('$wholePart.$decimalPart');
     }
 
-    // Secondary look without decimal strictness at the end if the above failed
-    final match2 = RegExp(r'(\d+)[\s.,]+(\d{2})\b').firstMatch(cleaned);
-    if (match2 != null) {
-      final whole = match2.group(1)!;
-      final decimal = match2.group(2)!;
-      return double.tryParse('$whole.$decimal');
-    }
-
-    // Look for single number that might be a price
-    final matchSingle = RegExp(r'\b(\d{1,6})\b').firstMatch(cleaned);
-    if (matchSingle != null) {
-      return double.tryParse(matchSingle.group(1)!);
+    // Fallback for lines without a clear separator but containing digits
+    final digitsOnly = cleaned.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.length > 2) {
+      // Assume last 2 digits are decimals if no separator found
+      String whole = digitsOnly.substring(0, digitsOnly.length - 2);
+      String dec = digitsOnly.substring(digitsOnly.length - 2);
+      return double.tryParse('$whole.$dec');
+    } else if (digitsOnly.isNotEmpty) {
+      return double.tryParse(digitsOnly);
     }
 
     return null;
@@ -305,10 +323,27 @@ class OcrService {
 
   String? _extractCurrency(List<String> lines) {
     for (final line in lines) {
+      final lower = line.toLowerCase();
       if (line.contains('\$')) return 'USD';
       if (line.contains('€')) return 'EUR';
       if (line.contains('£')) return 'GBP';
       if (line.contains('₺') || line.contains('TL')) return 'TRY';
+      
+      // Explicit labels
+      if (lower.contains('para cinsi')) {
+        if (line.contains('EUR') || line.contains('Avro') || line.contains('Euro')) return 'EUR';
+        if (line.contains('USD') || line.contains('Dolar')) return 'USD';
+        if (line.contains('TL') || line.contains('TRY')) return 'TRY';
+      }
+    }
+    
+    // Inference from keywords
+    for (final line in lines) {
+      final lower = line.toLowerCase();
+      if (lower.contains('toplam') || lower.contains('kasa') || 
+          lower.contains('girne') || lower.contains('caddesi')) {
+        return 'TRY';
+      }
     }
     return null;
   }
