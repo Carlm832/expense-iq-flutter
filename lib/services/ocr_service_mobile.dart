@@ -275,9 +275,13 @@ class OcrService {
       if (price != null) return price;
     }
 
-    // 2. Fallback to aggressive parsing if no clean match
     // Only proceed if there are ORIGINAL digits to avoid turn letters like "BORÇ" into "80"
     if (!RegExp(r'\d').hasMatch(line)) return null;
+    
+    // Safety check: A valid price shouldn't contain too many letters.
+    // This prevents strings like 'Sk. No: 1' becoming '5.01' after substitution.
+    final letters = line.replaceAll(RegExp(r'[^a-zA-Z]'), '');
+    if (letters.length > 3) return null;
 
     String cleaned = line.toUpperCase().trim();
     
@@ -307,10 +311,13 @@ class OcrService {
 
     // Fallback for lines without a clear separator but containing digits
     final digitsOnly = cleaned.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.length > 9) return null; // Reject long strings like "501790000015008"
+
     if (digitsOnly.length > 2) {
       // Assume last 2 digits are decimals if no separator found
       String whole = digitsOnly.substring(0, digitsOnly.length - 2);
       String dec = digitsOnly.substring(digitsOnly.length - 2);
+      if (whole.length > 7) return null;
       return double.tryParse('$whole.$dec');
     } else if (digitsOnly.isNotEmpty) {
       return double.tryParse(digitsOnly);
@@ -318,6 +325,7 @@ class OcrService {
 
     return null;
   }
+
 
   String? _extractDate(List<String> lines) {
     // Date patterns
