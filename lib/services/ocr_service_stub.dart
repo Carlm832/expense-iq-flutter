@@ -5,6 +5,7 @@ class OcrResult {
   final double? amount;
   final String? date;
   final String? currency;
+  final String? category;
   final String rawText;
   final bool success;
 
@@ -13,6 +14,7 @@ class OcrResult {
     this.amount,
     this.date,
     this.currency,
+    this.category,
     required this.rawText,
     required this.success,
   });

@@ -81,8 +81,9 @@ class OcrService {
     final ignoreKeywords = [
       'tax', 'vergi', 'fatur', 'tarih', 'saat', 'fis', 'fış', 'no:', 'tel:', 'adres',
       'mersis', 'ticaret', 'sicil', 'v.d.', 'toplam', 'total', 'kdv', 'matrah',
-      'cash', 'card', 'visa', 'mastercard', 'slip', 'pos', 'kredi', 'bank',
-      't.c', 'tc', 'odeme', 'ödenen', 'z rapor', 'z-rapor', 'tutar', 'vkn', 'mkn'
+      'cash', 'visa', 'mastercard', 'slip', 'pos', 'kredi',
+      't.c', 'tc', 'odeme', 'ödenen', 'z rapor', 'z-rapor', 'tutar', 'vkn', 'mkn',
+      'para cinsi', 'dekont', 'belge', 'fatura', 'musteri', 'müşteri'
     ];
 
     // Check the first 3 blocks primarily
@@ -121,7 +122,7 @@ class OcrService {
   double? _extractTotal(RecognizedText recognizedText) {
     final keywords = [
       'genel toplam', 'toplam', 'tutar', 'odenen', 'ödenen', 'net', 'yekun', 'total', 'grand total', 'sum', 'due', 'pay',
-      'total amount', 'balance due', 'amount due'
+      'total amount', 'balance due', 'amount due', 'borç', 'toplam net tutar'
     ];
     
     // Spatial search: Look for numbers to the RIGHT of a total keyword
@@ -145,6 +146,14 @@ class OcrService {
                 // and to the RIGHT of the keyword line
                 final verticalOverlap = (otherBox.top < keywordBox.bottom && otherBox.bottom > keywordBox.top);
                 if (verticalOverlap && otherBox.left > keywordBox.left) {
+                  final spatialPrice = _parsePriceAggr(otherLine.text);
+                  if (spatialPrice != null) return spatialPrice;
+                }
+
+                // 3. Look BELOW the keyword (for table headers like bank receipts)
+                // If it's horizontally aligned (X overlaps) and BELOW
+                final horizontalOverlap = (otherBox.left < keywordBox.right && otherBox.right > keywordBox.left);
+                if (horizontalOverlap && otherBox.top > keywordBox.top && (otherBox.top - keywordBox.bottom) < 50) {
                   final spatialPrice = _parsePriceAggr(otherLine.text);
                   if (spatialPrice != null) return spatialPrice;
                 }
@@ -217,8 +226,22 @@ class OcrService {
   }
 
   double? _parsePriceAggr(String line) {
-    // More aggressive price parsing with digit correction
-    // Clean common OCR errors in what should be a price
+    if (line.isEmpty) return null;
+    if (!RegExp(r'\d').hasMatch(line)) return null; // Must contain at least one digit
+    if (_isDate(line)) return null; // CRITICAL: Skip dates
+    
+    // 1. Try to find a clean price pattern (digits + separator + 1-2 digits)
+    // Matches 1.234,56 or 600,00 or 10.5
+    final priceMatch = RegExp(r'(\d{1,3}([.,]\d{3})*[.,]\d{1,2})\b').firstMatch(line);
+    if (priceMatch != null) {
+      final price = _parsePrice(priceMatch.group(1)!);
+      if (price != null) return price;
+    }
+
+    // 2. Fallback to aggressive parsing if no clean match
+    // Only proceed if there are ORIGINAL digits to avoid turn letters like "BORÇ" into "80"
+    if (!RegExp(r'\d').hasMatch(line)) return null;
+
     String cleaned = line.toUpperCase().trim();
     
     // Remove currency symbols and common noise
@@ -232,12 +255,10 @@ class OcrService {
     cleaned = cleaned.replaceAll('B', '8');
     cleaned = cleaned.replaceAll('A', '4');
 
-    // Handle thousands separators (e.g. 1.234,56 -> 1234,56)
-    // In Turkey, dot is often thousands and comma is decimal, but OCR mixes them up.
-    // If we see both a dot and a comma, the LAST one is almost certainly the decimal.
     final lastSeparatorIdx = cleaned.lastIndexOf(RegExp(r'[\.,]'));
     if (lastSeparatorIdx != -1) {
-      String wholePart = cleaned.substring(0, lastSeparatorIdx).replaceAll(RegExp(r'[\.,\s]'), '');
+      // Strip everything except digits from the whole part
+      String wholePart = cleaned.substring(0, lastSeparatorIdx).replaceAll(RegExp(r'\D'), '');
       String decimalPart = cleaned.substring(lastSeparatorIdx + 1).replaceAll(RegExp(r'\D'), '');
       if (decimalPart.length > 2) decimalPart = decimalPart.substring(0, 2);
       if (decimalPart.isEmpty) decimalPart = '00';
@@ -334,7 +355,12 @@ class OcrService {
     return null;
   }
 
-  bool _isPrice(String line) => _parsePriceAggr(line) != null;
+  bool _isPrice(String line) {
+    if (line.length > 15) return false;
+    final letters = line.replaceAll(RegExp(r'[^a-zA-Z]'), '');
+    if (letters.length > 3) return false; // Too many letters for a pure price
+    return _parsePriceAggr(line) != null;
+  }
 
   bool _isDate(String line) {
     return RegExp(r'\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}').hasMatch(line);
