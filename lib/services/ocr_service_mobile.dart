@@ -298,28 +298,26 @@ class OcrService {
 
     final lastSeparatorIdx = cleaned.lastIndexOf(RegExp(r'[\.,]'));
     if (lastSeparatorIdx != -1) {
-      // Strip everything except digits from the whole part
       String wholePart = cleaned.substring(0, lastSeparatorIdx).replaceAll(RegExp(r'\D'), '');
       String decimalPart = cleaned.substring(lastSeparatorIdx + 1).replaceAll(RegExp(r'\D'), '');
       if (decimalPart.length > 2) decimalPart = decimalPart.substring(0, 2);
       if (decimalPart.isEmpty) decimalPart = '00';
-      // Sanity check: whole part should not be more than 7 digits (max price ~9,999,999)
       if (wholePart.length > 7) return null;
       
       return double.tryParse('$wholePart.$decimalPart');
     }
 
-    // Fallback for lines without a clear separator but containing digits
-    final digitsOnly = cleaned.replaceAll(RegExp(r'\D'), '');
-    if (digitsOnly.length > 9) return null; // Reject long strings like "501790000015008"
+    // STRICT VALIDATION: If there is no separator, it MUST contain a currency 
+    // symbol in the raw line to be considered a valid monetary price.
+    // This prevents random IDs, zip codes, or quantites from being extracted.
+    final hasCurrency = RegExp(r'[\$€£₺]|TL|TRY', caseSensitive: false).hasMatch(line);
+    if (!hasCurrency) return null;
 
-    if (digitsOnly.length > 2) {
-      // Assume last 2 digits are decimals if no separator found
-      String whole = digitsOnly.substring(0, digitsOnly.length - 2);
-      String dec = digitsOnly.substring(digitsOnly.length - 2);
-      if (whole.length > 7) return null;
-      return double.tryParse('$whole.$dec');
-    } else if (digitsOnly.isNotEmpty) {
+    final digitsOnly = cleaned.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.length > 7) return null; 
+
+    if (digitsOnly.isNotEmpty) {
+      // If it has a currency symbol but no decimal, treat it as a whole number (e.g., "100 TL" -> 100.0)
       return double.tryParse(digitsOnly);
     }
 
