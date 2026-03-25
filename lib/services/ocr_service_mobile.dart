@@ -98,7 +98,7 @@ class OcrService {
     final topBlocks = recognizedText.blocks.toList()
       ..sort((a, b) => a.boundingBox.top.compareTo(b.boundingBox.top));
 
-    final ignoreKeywords = [
+    final ignoreList = [
       'tax', 'vergi', 'fatur', 'tarih', 'saat', 'fis', 'fış', 'no:', 'tel:', 'adres',
       'mersis', 'ticaret', 'sicil', 'v.d.', 'toplam', 'total', 'kdv', 'matrah',
       'cash', 'visa', 'mastercard', 'slip', 'pos', 'kredi',
@@ -106,31 +106,29 @@ class OcrService {
       'para cinsi', 'dekont', 'belge', 'fatura', 'musteri', 'müşteri'
     ];
 
-    // Check the first 3 blocks primarily
-    for (final block in topBlocks.take(5)) {
+    for (final block in topBlocks.take(6)) { 
       for (final line in block.lines) {
         final text = line.text.trim();
-        final lower = text.toLowerCase();
+        final normalized = text.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
         
         if (text.length < 3) continue;
         if (_isPrice(text)) continue;
         if (_isDate(text)) continue;
         
         bool shouldIgnore = false;
-        for (final keyword in ignoreKeywords) {
-          if (lower.contains(keyword)) {
+        for (final keyword in ignoreList) {
+          if (normalized.contains(keyword.replaceAll(RegExp(r'[^a-z0-9]'), ''))) {
             shouldIgnore = true;
             break;
           }
         }
         if (shouldIgnore) continue;
 
-        // Skip lines that look like addresses or random numeric identifiers
-        if (RegExp(r'\d{3,}.*\w').hasMatch(text)) continue;
-        if (RegExp(r'^[\d\s\-\/\.,\(\):]+$').hasMatch(text)) continue;
+        // Skip obvious contact info
+        if (RegExp(r'\d{3,}.*\w|\w+@\w+\.\w+').hasMatch(text)) continue;
+        if (RegExp(r'^[0-9\s\+\-\(\):]+$').hasMatch(text)) continue;
 
         String merchant = _capitalize(text);
-        // Clean up noise
         merchant = merchant.replaceAll(RegExp(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$'), '').trim();
         
         if (merchant.length >= 3) return merchant;
@@ -140,74 +138,86 @@ class OcrService {
   }
 
   double? _extractTotal(RecognizedText recognizedText) {
-    // High priority: final bill keywords searched first to avoid interim amounts
-    final highPriority = [
-      'to be payed', 'to be paid', 'genel toplam', 'borç', 'toplam net tutar',
-      'emv satis tutari', 'emv satış tutarı'
-    ];
-    // General keywords searched second
-    final general = [
-      'toplam', 'tutar', 'odenen', 'ödenen', 'net', 'yekun',
-      'total', 'grand total', 'sum', 'due', 'pay', 'total amount',
-      'balance due', 'amount due', 'invoices amount', 'amount collected', 'top'
-    ];
+    final List<_AmountCandidate> candidates = [];
+    final totalKeywords = ['genel toplam', 'toplam', 'total', 'grand total', ' yekun', 'amount due', 'pay', 'due', 'odenen', 'ödenen', 'to be payed', 'to be paid', 'toplam net tutar', 'emv satis tutari', 'emv satış tutarı', 'borç'];
+    final exclusionKeywords = ['ara toplam', 'subtotal', 'tax', 'kdv', 'k.d.v', 'discount', 'indirim', 'matrah', 'change', 'para ustu'];
 
-    for (final keywords in [highPriority, general]) {
-      for (final block in recognizedText.blocks) {
-        for (final line in block.lines) {
-          final lower = line.text.toLowerCase();
-          for (final keyword in keywords) {
-            if (lower.contains(keyword)) {
-              final price = _parsePriceAggr(line.text);
-              if (price != null) return price;
-
-              final keywordBox = line.boundingBox;
-              for (final otherBlock in recognizedText.blocks) {
-                for (final otherLine in otherBlock.lines) {
-                  if (otherLine == line) continue;
-                  final otherBox = otherLine.boundingBox;
-                  final verticalOverlap = (otherBox.top < keywordBox.bottom && otherBox.bottom > keywordBox.top);
-                  if (verticalOverlap && otherBox.left > keywordBox.left) {
-                    final spatialPrice = _parsePriceAggr(otherLine.text);
-                    if (spatialPrice != null) return spatialPrice;
-                  }
-                  final horizontalOverlap = (otherBox.left < keywordBox.right && otherBox.right > keywordBox.left);
-                  if (horizontalOverlap && otherBox.top > keywordBox.top && (otherBox.top - keywordBox.bottom) < 50) {
-                    final spatialPrice = _parsePriceAggr(otherLine.text);
-                    if (spatialPrice != null) return spatialPrice;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Fallback: search by keywords in raw text lines
-    final allKeywords = [...highPriority, ...general];
-    final lines = recognizedText.text.split('\n');
-    for (final line in lines.reversed) {
-      final lower = line.toLowerCase();
-      for (final keyword in allKeywords) {
-        if (lower.contains(keyword)) {
-          final p = _parsePriceAggr(line);
-          if (p != null) return p;
-        }
-      }
-    }
-
-    // Ultimate fallback: find the largest price value
-    double? largest;
+    // 1. Identify all potential prices and their context
     for (final block in recognizedText.blocks) {
       for (final line in block.lines) {
         final price = _parsePriceAggr(line.text);
         if (price != null && price > 0 && price < 1000000) {
-          if (largest == null || price > largest) largest = price;
+          candidates.add(_AmountCandidate(
+            value: price,
+            text: line.text,
+            boundingBox: line.boundingBox,
+            isBottomHalf: line.boundingBox.top > 500, // Heuristic for typical receipt size
+          ));
         }
       }
     }
-    return largest;
+
+    if (candidates.isEmpty) return null;
+
+    // 2. Score each candidate based on multiple signals
+    for (var candidate in candidates) {
+      final lineTextLow = candidate.text.toLowerCase();
+      
+      // Signal 1: Proximity to "Total" keywords (High weight)
+      for (final block in recognizedText.blocks) {
+        for (final line in block.lines) {
+          final low = line.text.toLowerCase();
+          if (_fuzzyMatch(low, totalKeywords)) {
+            final keywordBox = line.boundingBox;
+            // Immediate horizontal proximity (same line)
+            final verticalOverlap = (candidate.boundingBox.top < keywordBox.bottom && candidate.boundingBox.bottom > keywordBox.top);
+            if (verticalOverlap) {
+              candidate.score += 50;
+              if (candidate.boundingBox.left >= keywordBox.left) candidate.score += 30; // Usually to the right
+            }
+            // Vertical proximity (line below)
+            if (candidate.boundingBox.top > keywordBox.top && (candidate.boundingBox.top - keywordBox.bottom).abs() < 50) {
+              candidate.score += 40;
+            }
+          }
+        }
+      }
+
+      // Signal 2: Exclusion of subtotals/taxes (Negative weight)
+      if (_fuzzyMatch(lineTextLow, exclusionKeywords)) {
+        candidate.score -= 100;
+      }
+
+      // Signal 3: Bottom position preference (Moderate weight)
+      if (candidate.isBottomHalf) candidate.score += 20;
+
+      // Signal 4: Large value preference (Low weight, totals are usually largest)
+      // We'll normalize this after the loop
+    }
+
+    // Sort by score and then by value (tie-break with larger value)
+    candidates.sort((a, b) {
+      if (b.score != a.score) return b.score.compareTo(a.score);
+      return b.value.compareTo(a.value);
+    });
+
+    // Filtering: If the highest score is negative and there are other options, ignore it
+    final best = candidates.first;
+    if (best.score <= -50 && candidates.length > 1) {
+       // Search for largest positive or least negative
+       return candidates.where((c) => c.score > -50).firstOrNull?.value ?? best.value;
+    }
+
+    return best.value;
+  }
+
+  bool _fuzzyMatch(String text, List<String> keywords) {
+    final normalized = text.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    for (final k in keywords) {
+      final normK = k.replaceAll(RegExp(r'[^a-z0-9]'), '');
+      if (normalized.contains(normK)) return true;
+    }
+    return false;
   }
 
   String suggestCategory(String? merchant) {
@@ -267,63 +277,51 @@ class OcrService {
     if (!RegExp(r'\d').hasMatch(line)) return null; // Must contain at least one digit
     if (_isDate(line)) return null; // CRITICAL: Skip dates
     
-    // 1. Try to find a clean price pattern (digits + separator + 1-2 digits)
-    // Matches 1.234,56 or 600,00 or 10.5
-    final priceMatch = RegExp(r'(\d{1,3}([.,]\d{3})*[.,]\d{1,2})\b').firstMatch(line);
+    // 1. Pre-cleaning: remove currency symbols and whitespace between digits
+    String cleaned = line.toUpperCase().trim();
+    cleaned = cleaned.replaceAll(RegExp(r'[\$€£₺]|TL|TRY'), '');
+    cleaned = cleaned.replaceAllMapped(RegExp(r'(\d)\s+(\d)'), (m) => '${m[1]}${m[2]}');
+
+    // 2. OCR character substitution (Apply only if it helps form a number)
+    final substitutions = {'S': '5', 'O': '0', 'L': '1', 'I': '1', 'B': '8', 'A': '4', 'G': '6'};
+    substitutions.forEach((key, value) {
+      cleaned = cleaned.replaceAllMapped(RegExp('(?<=[\\d\\.,])$key|(?=[\\d\\.,])$key'), (m) => value);
+    });
+    
+    // 3. Try to find a clean price pattern (digits + separator + 1-2 digits)
+    final priceMatch = RegExp(r'(\d{1,3}([.,]\d{3})*[.,]\d{1,2})\b').firstMatch(cleaned);
     if (priceMatch != null) {
       final price = _parsePrice(priceMatch.group(1)!);
       if (price != null) return price;
     }
 
-    // Only proceed if there are ORIGINAL digits to avoid turn letters like "BORÇ" into "80"
-    if (!RegExp(r'\d').hasMatch(line)) return null;
-    
     // Safety check: A valid price shouldn't contain too many letters.
-    // This prevents strings like 'Sk. No: 1' becoming '5.01' after substitution.
-    final letters = line.replaceAll(RegExp(r'[^a-zA-Z]'), '');
+    final letters = cleaned.replaceAll(RegExp(r'[^a-zA-Z]'), '');
     if (letters.length > 3) return null;
 
-    String cleaned = line.toUpperCase().trim();
-    
-    // Remove currency symbols and common noise
-    cleaned = cleaned.replaceAll(RegExp(r'[\$€£₺]|TL|TRY'), '');
-    
-    // OCR character correction
-    cleaned = cleaned.replaceAll('S', '5');
-    cleaned = cleaned.replaceAll('O', '0');
-    cleaned = cleaned.replaceAll('L', '1');
-    cleaned = cleaned.replaceAll('I', '1');
-    cleaned = cleaned.replaceAll('B', '8');
-    cleaned = cleaned.replaceAll('A', '4');
-
+    // 4. Handle decimal/thousands separators for mixed formats
     final lastSeparatorIdx = cleaned.lastIndexOf(RegExp(r'[\.,]'));
     if (lastSeparatorIdx != -1) {
-      // Strip everything except digits from the whole part
-      String wholePart = cleaned.substring(0, lastSeparatorIdx).replaceAll(RegExp(r'\D'), '');
-      String decimalPart = cleaned.substring(lastSeparatorIdx + 1).replaceAll(RegExp(r'\D'), '');
+      String wholePart = cleaned.substring(0, lastSeparatorIdx).replaceAll(RegExp(r'[^0-9]'), '');
+      String decimalPart = cleaned.substring(lastSeparatorIdx + 1).replaceAll(RegExp(r'[^0-9]'), '');
+      
       if (decimalPart.length > 2) decimalPart = decimalPart.substring(0, 2);
       if (decimalPart.isEmpty) decimalPart = '00';
-      // Sanity check: whole part should not be more than 7 digits (max price ~9,999,999)
       if (wholePart.length > 7) return null;
       
       return double.tryParse('$wholePart.$decimalPart');
     }
 
-    // Fallback for lines without a clear separator but containing digits
-    final digitsOnly = cleaned.replaceAll(RegExp(r'\D'), '');
-    if (digitsOnly.length > 9) return null; // Reject long strings like "501790000015008"
-
-    if (digitsOnly.length > 2) {
-      // Assume last 2 digits are decimals if no separator found
-      String whole = digitsOnly.substring(0, digitsOnly.length - 2);
-      String dec = digitsOnly.substring(digitsOnly.length - 2);
+    // 5. Fallback for no separator (Assume last 2 digits are decimals)
+    final digits = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length > 2) {
+      String whole = digits.substring(0, digits.length - 2);
+      String dec = digits.substring(digits.length - 2);
       if (whole.length > 7) return null;
       return double.tryParse('$whole.$dec');
-    } else if (digitsOnly.isNotEmpty) {
-      return double.tryParse(digitsOnly);
     }
-
-    return null;
+    
+    return double.tryParse(digits);
   }
 
 
@@ -460,4 +458,19 @@ class OcrService {
   void dispose() {
     _textRecognizer.close();
   }
+}
+
+class _AmountCandidate {
+  final double value;
+  final String text;
+  final Rect boundingBox;
+  final bool isBottomHalf;
+  int score = 0;
+
+  _AmountCandidate({
+    required this.value,
+    required this.text,
+    required this.boundingBox,
+    required this.isBottomHalf,
+  });
 }
