@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
 import '../theme.dart';
-import 'camera_screen.dart';
 import '../services/translations.dart';
 import '../app_state.dart';
 import '../services/ocr_service.dart';
@@ -42,25 +40,17 @@ class _ScanScreenState extends State<ScanScreen>
     super.dispose();
   }
 
-  Future<void> _scan(ImageSource source) async {
+  Future<void> _scan() async {
     HapticFeedback.lightImpact();
     setState(() {
       _isScanning = true;
       _scanFailed = false;
-      _statusMessage = 'Picking image...';
+      _statusMessage = 'Starting scanner...';
     });
     _scanAnimationCtrl.repeat(reverse: true);
 
     try {
-      XFile? imageFile;
-      if (source == ImageSource.camera) {
-        imageFile = await Navigator.push<XFile>(
-          context,
-          MaterialPageRoute(builder: (_) => const CameraScreen()),
-        );
-      } else {
-        imageFile = await _ocrService.pickImage(source);
-      }
+      final imageFile = await _ocrService.scanReceipt();
 
       if (imageFile == null) {
         _scanAnimationCtrl.stop();
@@ -183,17 +173,10 @@ class _ScanScreenState extends State<ScanScreen>
                 ),
               ] else if (!_isScanning) ...[
                 _ActionButton(
-                  icon: Icons.camera_alt,
-                  label: Translations.t('take_photo', lang),
-                  onPressed: () => _scan(ImageSource.camera),
+                  icon: Icons.document_scanner,
+                  label: Translations.t('nav_scan', lang),
+                  onPressed: _scan,
                   primary: true,
-                ),
-                const SizedBox(height: 12),
-                _ActionButton(
-                  icon: Icons.photo_library,
-                  label: Translations.t('from_gallery', lang),
-                  onPressed: () => _scan(ImageSource.gallery),
-                  primary: false,
                 ),
               ],
             ],

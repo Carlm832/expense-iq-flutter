@@ -21,9 +21,9 @@ class OcrResult {
 }
 
 class OcrService {
-  Future<XFile?> pickImage(ImageSource source) async {
+  Future<XFile?> scanReceipt() async {
     return ImagePicker().pickImage(
-      source: source,
+      source: ImageSource.camera,
       imageQuality: 90,
       maxWidth: 2048,
     );

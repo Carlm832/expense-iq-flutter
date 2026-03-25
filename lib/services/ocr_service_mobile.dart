@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
-
+import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
+import 'dart:ui';
 class OcrResult {
   final String? merchant;
   final double? amount;
@@ -24,14 +25,24 @@ class OcrResult {
 
 class OcrService {
   final _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-  final _imagePicker = ImagePicker();
 
-  Future<XFile?> pickImage(ImageSource source) async {
-    return _imagePicker.pickImage(
-      source: source,
-      imageQuality: 90,
-      maxWidth: 2048,
-    );
+  Future<XFile?> scanReceipt() async {
+    try {
+      final options = DocumentScannerOptions(
+        mode: ScannerMode.filter,
+        pageLimit: 1,
+        isGalleryImport: true,
+      );
+      final documentScanner = DocumentScanner(options: options);
+      final result = await documentScanner.scanDocument();
+      if (result.images?.isNotEmpty == true) {
+        return XFile(result.images!.first);
+      }
+      return null;
+    } catch (e) {
+      // User canceled or scanner failed
+      return null;
+    }
   }
 
   Future<OcrResult> processImage(XFile imageFile) async {
