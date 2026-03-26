@@ -78,16 +78,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             style: GoogleFonts.inter(
                                 fontSize: 12, color: mutedColor)),
                       ])),
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.download, size: 14),
-                    label: Text('CSV', style: GoogleFonts.inter(fontSize: 12)),
-                    style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12))),
-                  ),
                 ]),
                 const SizedBox(height: 12),
                 // Search

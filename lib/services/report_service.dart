@@ -1,24 +1,24 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:csv/csv.dart';
-import 'package:path_provider/path_provider.dart';
 import '../models.dart';
 
 class ReportService {
-  static Future<File> generateCSV(List<Expense> expenses, String currency) async {
+  static Future<void> generateCSV(List<Expense> expenses, String currency) async {
     List<List<dynamic>> rows = [];
     rows.add(['ID', 'Merchant', 'Date', 'Amount', 'Currency', 'Category']);
-
     for (var e in expenses) {
       rows.add([e.id, e.merchant, e.date, e.amount, e.currency, e.category]);
     }
-
     String csvData = const ListToCsvConverter().convert(rows);
-    final directory = await getTemporaryDirectory();
-    final file = File('${directory.path}/expense_report_${DateTime.now().millisecondsSinceEpoch}.csv');
-    return await file.writeAsString(csvData);
+    final bytes = Uint8List.fromList(utf8.encode(csvData));
+    await Printing.sharePdf(
+      bytes: bytes,
+      filename: 'expense_report_${DateTime.now().millisecondsSinceEpoch}.csv',
+    );
   }
 
   static Future<void> generateAndPrintPDF(

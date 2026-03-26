@@ -45,6 +45,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   // Overall Budget
   double _overallBudget = 2500.0;
+  List<int> _budgetWarningIntervals = [50, 75, 90, 100];
+  int _lastWarningThreshold = 0;
   bool _hasSeenBudgetWarningThisMonth = false;
 
   // Syncing logic for Dashboard month selection (added by collaborator)
@@ -80,6 +82,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   bool get showExpenseDetail => _showExpenseDetail;
   int get unreadCount => _notifications.where((n) => !n.read).length;
   bool get hasSeenBudgetWarningThisMonth => _hasSeenBudgetWarningThisMonth;
+  List<int> get budgetWarningIntervals => _budgetWarningIntervals;
+  int get lastWarningThreshold => _lastWarningThreshold;
   String get selectedMonth => _selectedMonth;
 
   String get language => _language;
@@ -186,8 +190,23 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _pushNotificationsEnabled =
         prefs.getBool('pushNotificationsEnabled') ?? true;
     _overallBudget = prefs.getDouble('overallBudget') ?? 2500.0;
-    _hasSeenBudgetWarningThisMonth =
-        prefs.getBool('hasSeenBudgetWarningThisMonth') ?? false;
+    
+    final String currentMonth = DateTime.now().toIso8601String().substring(0, 7);
+    final String lastMonthOpened = prefs.getString('lastMonthOpened') ?? currentMonth;
+    
+    if (lastMonthOpened != currentMonth) {
+       _hasSeenBudgetWarningThisMonth = false;
+       _lastWarningThreshold = 0;
+       prefs.setString('lastMonthOpened', currentMonth);
+       prefs.setBool('hasSeenBudgetWarningThisMonth', false);
+       prefs.setInt('lastWarningThreshold', 0);
+    } else {
+       _hasSeenBudgetWarningThisMonth = prefs.getBool('hasSeenBudgetWarningThisMonth') ?? false;
+       _lastWarningThreshold = prefs.getInt('lastWarningThreshold') ?? 0;
+    }
+    
+    _budgetWarningIntervals = (prefs.getStringList('budgetWarningIntervals') ?? ['50', '75', '90', '100'])
+        .map((s) => int.parse(s)).toList();
     _pin = prefs.getString('appPin') ?? '';
     // Load persisted notifications
     final notifJson = prefs.getString('notifications');
@@ -236,6 +255,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         'currency': _currency,
         'pushNotificationsEnabled': _pushNotificationsEnabled,
         'overallBudget': _overallBudget,
+        'budgetWarningIntervals': _budgetWarningIntervals,
+        'lastWarningThreshold': _lastWarningThreshold,
         'appPin': _pin,
         'isBiometricEnabled': _isBiometricEnabled,
         'displayName': _userName,
@@ -280,6 +301,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         if (data.containsKey('overallBudget')) {
           _overallBudget = (data['overallBudget'] as num).toDouble();
           await prefs.setDouble('overallBudget', _overallBudget);
+        }
+        if (data.containsKey('budgetWarningIntervals')) {
+          _budgetWarningIntervals = List<int>.from(data['budgetWarningIntervals']);
+          await prefs.setStringList('budgetWarningIntervals', _budgetWarningIntervals.map((i) => i.toString()).toList());
         }
         if (data.containsKey('appPin')) {
           _pin = data['appPin'];
@@ -741,5 +766,25 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       _isPinLocked = false;
       notifyListeners();
     }
+  }
+
+  Future<void> setBudgetWarningIntervals(List<int> intervals) async {
+    _budgetWarningIntervals = intervals;
+    _budgetWarningIntervals.sort();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('budgetWarningIntervals',
+        _budgetWarningIntervals.map((i) => i.toString()).toList());
+    
+    await _savePreferences();
+    notifyListeners();
+  }
+
+  Future<void> setLastWarningThreshold(int threshold) async {
+    _lastWarningThreshold = threshold;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('lastWarningThreshold', threshold);
+    
+    await _savePreferences();
+    notifyListeners();
   }
 }

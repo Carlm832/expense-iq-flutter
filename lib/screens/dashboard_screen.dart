@@ -17,20 +17,33 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   void _checkAndShowAlert() {
     final state = context.read<AppState>();
-    final isCurrentMonth = state.selectedMonth == DateTime.now().toIso8601String().substring(0, 7);
+    final isCurrentMonth =
+        state.selectedMonth == DateTime.now().toIso8601String().substring(0, 7);
 
-    if (state.overallBudget > 0 && isCurrentMonth && !state.hasSeenBudgetWarningThisMonth) {
+    if (state.overallBudget > 0 && isCurrentMonth) {
       final total = state.expenses
           .where((e) => e.date.startsWith(state.selectedMonth))
           .fold(0.0, (s, e) => s + e.amount);
-      if (total >= state.overallBudget * 0.9) {
+
+      final percent = (total / state.overallBudget) * 100;
+
+      int? highestCrossed;
+      for (var threshold in state.budgetWarningIntervals) {
+        if (percent >= threshold && threshold > state.lastWarningThreshold) {
+          highestCrossed = threshold;
+        }
+      }
+
+      if (highestCrossed != null) {
+        final thresholdValue = highestCrossed;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          state.setHasSeenBudgetWarningThisMonth(true);
-          _showBudgetWarning();
+          state.setLastWarningThreshold(thresholdValue);
+          _showBudgetWarning(thresholdValue);
           state.pushNotification(
-            title: 'budget_alert',
-            message: Translations.t('budget_warning_msg', state.language),
+            title: Translations.t('budget_alert', state.language),
+            message:
+                '${Translations.t('budget_warning_msg_part1', state.language)} $highestCrossed% ${Translations.t('budget_warning_msg_part2', state.language)}',
             type: 'warning',
           );
         });
@@ -38,13 +51,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _showBudgetWarning() {
+  void _showBudgetWarning(int percent) {
     final state = context.read<AppState>();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(Translations.t('budget_alert', state.language)),
-        content: Text(Translations.t('budget_warning_msg', state.language)),
+        content: Text(
+            '${Translations.t('budget_warning_msg_part1', state.language)} $percent% ${Translations.t('budget_warning_msg_part2', state.language)}'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx),

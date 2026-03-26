@@ -152,16 +152,6 @@ class SettingsScreen extends StatelessWidget {
                     !state.pushNotificationsEnabled);
               }),
           _SettingsTile(
-              icon: Icons.security,
-              label: 'Privacy & Security',
-              value: '',
-              fgColor: fgColor,
-              mutedColor: mutedColor,
-              borderColor: borderColor,
-              onTap: () {
-                state.setCurrentScreen('privacy');
-              }),
-          _SettingsTile(
               icon: Icons.backup_outlined,
               label: Translations.t('backup_data', state.language),
               value: '',
@@ -283,6 +273,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
     final fgColor = isDark ? AppColors.darkForeground : AppColors.foreground;
     final cardColor = isDark ? AppColors.darkCard : AppColors.card;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.border;
+    final lang = state.language;
 
     return _buildSimpleScreen(
         context,
@@ -319,6 +310,43 @@ class _BudgetScreenState extends State<BudgetScreen> {
         ]),
       ),
       const SizedBox(height: 24),
+      
+      // Warning Thresholds
+      Row(children: [
+        Expanded(child: Text(Translations.t('warning_thresholds', lang),
+          style: GoogleFonts.dmSans(fontSize: 16, fontWeight: FontWeight.w700, color: fgColor))),
+        IconButton(
+          onPressed: () => _showAddThresholdDialog(context),
+          icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+        ),
+      ]),
+      const SizedBox(height: 12),
+      
+      if (state.budgetWarningIntervals.isEmpty)
+        Center(child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(Translations.t('no_data', lang), 
+            style: GoogleFonts.inter(color: fgColor.withValues(alpha: 0.5))),
+        ))
+      else
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: state.budgetWarningIntervals.map((t) => Chip(
+            label: Text('$t%'),
+            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+            labelStyle: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
+            onDeleted: () {
+               final newList = List<int>.from(state.budgetWarningIntervals)..remove(t);
+               state.setBudgetWarningIntervals(newList);
+            },
+            deleteIconColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+            side: BorderSide.none,
+          )).toList(),
+        ),
+
+      const SizedBox(height: 32),
       SizedBox(
         width: double.infinity,
         child: ElevatedButton(
@@ -331,6 +359,49 @@ class _BudgetScreenState extends State<BudgetScreen> {
         ),
       ),
     ]);
+  }
+
+  void _showAddThresholdDialog(BuildContext context) {
+    final state = context.read<AppState>();
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(Translations.t('add_threshold', state.language)),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: Translations.t('enter_threshold_hint', state.language),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(Translations.t('cancel', state.language))),
+          TextButton(
+            onPressed: () {
+              final val = int.tryParse(ctrl.text);
+              if (val != null && val > 0 && val <= 100) {
+                if (!state.budgetWarningIntervals.contains(val)) {
+                  final newList = [...state.budgetWarningIntervals, val];
+                  state.setBudgetWarningIntervals(newList);
+                  Navigator.pop(ctx);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(Translations.t('threshold_already_exists', state.language)))
+                  );
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(Translations.t('invalid_threshold', state.language)))
+                );
+              }
+            },
+            child: Text(Translations.t('save', state.language)),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -560,7 +631,7 @@ class PrivacyScreen extends StatelessWidget {
     final cardColor = isDark ? AppColors.darkCard : AppColors.card;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.border;
     final lang = state.language;
-    return _buildSimpleScreen(context, 'Privacy & Security',
+    return _buildSimpleScreen(context, Translations.t('privacy_title', lang),
         Translations.t('data_protection', lang), [
       Container(
         decoration: BoxDecoration(
