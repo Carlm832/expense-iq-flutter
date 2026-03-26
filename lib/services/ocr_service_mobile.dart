@@ -150,7 +150,9 @@ class OcrService {
 
   double? _extractTotal(RecognizedText recognizedText) {
     final List<_AmountCandidate> candidates = [];
-    final totalKeywords = ['genel toplam', 'toplam', 'total', 'grand total', ' yekun', 'amount due', 'pay', 'due', 'odenen', 'ödenen', 'to be payed', 'to be paid', 'toplam net tutar', 'emv satis tutari', 'emv satış tutarı', 'borç'];
+    // Ordered by priority — genel toplam must be checked before toplam
+    final highPriorityKeywords = ['genel toplam', 'toplam net tutar', 'emv satis tutari', 'emv satış tutarı', 'grand total', 'amount due', 'to be payed', 'to be paid'];
+    final normalKeywords = ['toplam', 'total', 'yekun', 'odenen', 'ödenen', 'borç', 'due', 'pay'];
     final exclusionKeywords = ['ara toplam', 'subtotal', 'tax', 'kdv', 'k.d.v', 'discount', 'indirim', 'matrah', 'change', 'para ustu'];
 
     // 1. Identify all potential prices and their context
@@ -162,7 +164,6 @@ class OcrService {
             value: price,
             text: line.text,
             boundingBox: line.boundingBox,
-            isBottomHalf: line.boundingBox.top > 500, // Heuristic for typical receipt size
           ));
         }
       }
@@ -170,53 +171,67 @@ class OcrService {
 
     if (candidates.isEmpty) return null;
 
+    // Compute dynamic bottom-half threshold (bottom 40% of receipt height)
+    final maxBottom = candidates.map((c) => c.boundingBox.bottom).reduce((a, b) => a > b ? a : b);
+    final minTop = candidates.map((c) => c.boundingBox.top).reduce((a, b) => a < b ? a : b);
+    final receiptHeight = maxBottom - minTop;
+    final bottomThreshold = minTop + receiptHeight * 0.6;
+
     // 2. Score each candidate based on multiple signals
     for (var candidate in candidates) {
       final lineTextLow = candidate.text.toLowerCase();
-      
-      // Signal 1: Proximity to "Total" keywords (High weight)
+
+      // Signal 1: Proximity to total keywords (scored by priority level)
       for (final block in recognizedText.blocks) {
         for (final line in block.lines) {
           final low = line.text.toLowerCase();
-          if (_fuzzyMatch(low, totalKeywords)) {
-            final keywordBox = line.boundingBox;
-            // Immediate horizontal proximity (same line)
-            final verticalOverlap = (candidate.boundingBox.top < keywordBox.bottom && candidate.boundingBox.bottom > keywordBox.top);
-            if (verticalOverlap) {
-              candidate.score += 50;
-              if (candidate.boundingBox.left >= keywordBox.left) candidate.score += 30; // Usually to the right
-            }
-            // Vertical proximity (line below)
-            if (candidate.boundingBox.top > keywordBox.top && (candidate.boundingBox.top - keywordBox.bottom).abs() < 50) {
-              candidate.score += 40;
-            }
+          final isHighPriority = _fuzzyMatch(low, highPriorityKeywords);
+          final isNormalPriority = !isHighPriority && _fuzzyMatch(low, normalKeywords);
+          if (!isHighPriority && !isNormalPriority) continue;
+
+          final keywordBox = line.boundingBox;
+          final proximityScore = isHighPriority ? 80 : 50;
+
+          // Same line (horizontal overlap)
+          final verticalOverlap = (candidate.boundingBox.top < keywordBox.bottom &&
+              candidate.boundingBox.bottom > keywordBox.top);
+          if (verticalOverlap) {
+            candidate.score += proximityScore;
+            if (candidate.boundingBox.left >= keywordBox.left) candidate.score += 30; // right side
+          }
+          // Line immediately below keyword
+          if (candidate.boundingBox.top > keywordBox.top &&
+              (candidate.boundingBox.top - keywordBox.bottom).abs() < 60) {
+            candidate.score += (proximityScore * 0.75).round();
           }
         }
       }
 
-      // Signal 2: Exclusion of subtotals/taxes (Negative weight)
+      // Signal 2: Exclusion of subtotals/taxes
       if (_fuzzyMatch(lineTextLow, exclusionKeywords)) {
         candidate.score -= 100;
       }
 
-      // Signal 3: Bottom position preference (Moderate weight)
-      if (candidate.isBottomHalf) candidate.score += 20;
+      // Signal 3: Dynamic bottom-half preference
+      if (candidate.boundingBox.top >= bottomThreshold) candidate.score += 20;
 
-      // Signal 4: Large value preference (Low weight, totals are usually largest)
-      // We'll normalize this after the loop
+      // Signal 4: Last price in receipt by Y-position (strong signal — totals are at the end)
+      if (candidate.boundingBox.top == maxBottom ||
+          (candidate.boundingBox.top - maxBottom).abs() < 80) {
+        candidate.score += 15;
+      }
     }
 
-    // Sort by score and then by value (tie-break with larger value)
+    // Sort by score descending; tiebreak: prefer larger value
     candidates.sort((a, b) {
       if (b.score != a.score) return b.score.compareTo(a.score);
       return b.value.compareTo(a.value);
     });
 
-    // Filtering: If the highest score is negative and there are other options, ignore it
     final best = candidates.first;
+    // If best has highly negative score and alternatives exist, pick best non-negative
     if (best.score <= -50 && candidates.length > 1) {
-       // Search for largest positive or least negative
-       return candidates.where((c) => c.score > -50).firstOrNull?.value ?? best.value;
+      return candidates.where((c) => c.score > -50).firstOrNull?.value ?? best.value;
     }
 
     return best.value;
@@ -315,10 +330,18 @@ class OcrService {
     if (lastSeparatorIdx != -1) {
       String wholePart = cleaned.substring(0, lastSeparatorIdx).replaceAll(RegExp(r'\D'), '');
       String decimalPart = cleaned.substring(lastSeparatorIdx + 1).replaceAll(RegExp(r'\D'), '');
+
+      // If "decimal" part has exactly 3 digits and there are digits before the separator,
+      // it's a thousands separator (Turkish style: "1.200" means 1200, not 1.20)
+      if (decimalPart.length == 3 && wholePart.isNotEmpty) {
+        final combined = double.tryParse('$wholePart$decimalPart');
+        if (combined != null) return combined;
+      }
+
       if (decimalPart.length > 2) decimalPart = decimalPart.substring(0, 2);
       if (decimalPart.isEmpty) decimalPart = '00';
       if (wholePart.length > 7) return null;
-      
+
       return double.tryParse('$wholePart.$decimalPart');
     }
 
@@ -479,13 +502,11 @@ class _AmountCandidate {
   final double value;
   final String text;
   final Rect boundingBox;
-  final bool isBottomHalf;
   int score = 0;
 
   _AmountCandidate({
     required this.value,
     required this.text,
     required this.boundingBox,
-    required this.isBottomHalf,
   });
 }
