@@ -730,6 +730,7 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameCtrl;
   late TextEditingController _emailCtrl;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -780,12 +781,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       SizedBox(
         width: double.infinity,
         child: ElevatedButton(
-          onPressed: () {
-            state.setUserName(_nameCtrl.text.trim());
-            state.setUserEmail(_emailCtrl.text.trim());
-            state.goBack();
+          onPressed: _isSaving ? null : () async {
+            setState(() => _isSaving = true);
+            try {
+              await state.setUserName(_nameCtrl.text.trim());
+              await state.setUserEmail(_emailCtrl.text.trim());
+              state.goBack();
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error saving changes: $e')),
+                );
+              }
+            } finally {
+              if (mounted) setState(() => _isSaving = false);
+            }
           },
-          child: Text(Translations.t('save_changes', lang)),
+          child: _isSaving
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : Text(Translations.t('save_changes', lang)),
         ),
       ),
     ]);

@@ -128,7 +128,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       if (_lastPausedTime != null) {
         final now = DateTime.now();
         final diff = now.difference(_lastPausedTime!);
-        if (diff.inSeconds >= 90) {
+        if (diff.inSeconds >= 60) {
           if (_isLoggedIn && (_pin.isNotEmpty || _isBiometricEnabled) && !_isPinLocked) {
             _isPinLocked = true;
             notifyListeners();
@@ -145,7 +145,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         _isLoggedIn = true;
         _userName = user.displayName ?? '';
         _userEmail = user.email ?? '';
-        _profileImage = user.photoURL ?? '';
+        
+        // Only prioritize photoURL if we don't have a local one already
+        if (_profileImage.isEmpty) {
+          _profileImage = user.photoURL ?? '';
+        }
 
         _syncDataFromFirestore(user.uid);
 
@@ -260,6 +264,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         'appPin': _pin,
         'isBiometricEnabled': _isBiometricEnabled,
         'displayName': _userName,
+        'profileImage': _profileImage,
       }, SetOptions(merge: true));
     }
   }
@@ -317,6 +322,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         if (data.containsKey('displayName')) {
           _userName = data['displayName'];
           await prefs.setString('userName', _userName);
+        }
+        if (data.containsKey('profileImage')) {
+          _profileImage = data['profileImage'];
+          await prefs.setString('profileImage', _profileImage);
         }
         if (data.containsKey('notifications')) {
           final List<dynamic> notifs = data['notifications'];
@@ -452,31 +461,53 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   }
 
 
-  void setUserName(String name) {
+  Future<void> setUserName(String name) async {
     _userName = name;
     notifyListeners();
-    SharedPreferences.getInstance().then((p) => p.setString('userName', name));
-  }
-
-  void setUserEmail(String email) {
-    _userEmail = email;
-    notifyListeners();
-    SharedPreferences.getInstance()
-        .then((p) => p.setString('userEmail', email));
-  }
-
-  void setProfileImage(String img) {
-    _profileImage = img;
-    notifyListeners();
-    SharedPreferences.getInstance()
-        .then((p) => p.setString('profileImage', img));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('userName', name);
 
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      _db
-          .collection('users')
-          .doc(user.uid)
-          .set({'profileImage': img}, SetOptions(merge: true));
+      await user.updateDisplayName(name);
+      await _savePreferences();
+    }
+  }
+
+  Future<void> setUserEmail(String email) async {
+    _userEmail = email;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('userEmail', email);
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        await user.verifyBeforeUpdateEmail(email);
+      } catch (e) {
+        // ignore: avoid_print
+        print('Email update error: $e');
+      }
+      await _savePreferences();
+    }
+  }
+
+  Future<void> setProfileImage(String img) async {
+    _profileImage = img;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('profileImage', img);
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      if (img.startsWith('http')) {
+        await user.updatePhotoURL(img);
+      }
+      // Always sync to Firestore via _savePreferences or direct set
+      await _db.collection('users').doc(user.uid).set({
+        'profileImage': img,
+      }, SetOptions(merge: true));
+      await _savePreferences();
     }
   }
 

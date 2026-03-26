@@ -40,7 +40,7 @@ class ProfileScreen extends StatelessWidget {
     final picked =
         await ImagePicker().pickImage(source: source, imageQuality: 85);
     if (picked != null) {
-      state.setProfileImage(picked.path);
+      await state.setProfileImage(picked.path);
     }
   }
 
