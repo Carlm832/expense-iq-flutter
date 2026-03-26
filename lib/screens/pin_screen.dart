@@ -19,7 +19,7 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
   bool _error = false;
 
   void _onKey(String digit) {
-    if (_entered.length >= 6) return;
+    if (_entered.length >= 4) return;
     setState(() {
       _entered += digit;
       _error = false;
@@ -105,8 +105,18 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
               ),
             const SizedBox(height: 32),
             // Numpad
-            _Numpad(onKey: _onKey, onDelete: _onDelete,
-                cardColor: cardColor, fgColor: fgColor),
+            _Numpad(
+                onKey: _onKey,
+                onDelete: _onDelete,
+                cardColor: cardColor,
+                fgColor: fgColor,
+                extraAction: state.isBiometricEnabled
+                    ? IconButton(
+                        icon: const Icon(Icons.fingerprint, size: 28),
+                        onPressed: state.authenticateWithBiometrics,
+                        color: AppColors.primary,
+                      )
+                    : null),
             const SizedBox(height: 24),
             TextButton(
               onPressed: () async {
@@ -143,16 +153,9 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
     setState(() {
       _mismatch = false;
       if (!_confirming) {
-        if (_first.length < 6) _first += digit;
-        if (_first.length == 6) {
-          Future.delayed(const Duration(milliseconds: 150),
-              () => setState(() => _confirming = true));
-        }
+        if (_first.length < 4) _first += digit;
       } else {
-        if (_confirm.length < 6) _confirm += digit;
-        if (_confirm.length == _first.length) {
-          Future.delayed(const Duration(milliseconds: 150), _finish);
-        }
+        if (_confirm.length < 4) _confirm += digit;
       }
     });
   }
@@ -196,7 +199,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
         isDark ? AppColors.darkMutedForeground : AppColors.mutedForeground;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.border;
     final current = _confirming ? _confirm : _first;
-    const maxLen = 6;
+    const maxLen = 4;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -223,7 +226,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              _confirming ? 'Confirm your PIN' : 'Choose a PIN (up to 6 digits)',
+              _confirming ? 'Confirm your PIN' : 'Choose a PIN (4 digits)',
               style: GoogleFonts.inter(fontSize: 14, color: mutedColor),
             ),
             const SizedBox(height: 24),
@@ -262,6 +265,28 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
             const SizedBox(height: 32),
             _Numpad(onKey: _onKey, onDelete: _onDelete,
                 cardColor: cardColor, fgColor: fgColor),
+            if (!_confirming && _first.length == 4)
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => setState(() => _confirming = true),
+                    child: const Text('Continue'),
+                  ),
+                ),
+              ),
+            if (_confirming && _confirm.length == 4)
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _finish,
+                    child: const Text('Save PIN'),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -277,12 +302,14 @@ class _Numpad extends StatelessWidget {
   final VoidCallback onDelete;
   final Color cardColor;
   final Color fgColor;
+  final Widget? extraAction;
 
   const _Numpad(
       {required this.onKey,
       required this.onDelete,
       required this.cardColor,
-      required this.fgColor});
+      required this.fgColor,
+      this.extraAction});
 
   @override
   Widget build(BuildContext context) {
@@ -297,7 +324,7 @@ class _Numpad extends StatelessWidget {
         crossAxisSpacing: 12,
         children: [
           ...keys.map((k) => k.isEmpty
-              ? const SizedBox()
+              ? (extraAction ?? const SizedBox())
               : _NumKey(label: k, onTap: () => onKey(k),
                   cardColor: cardColor, fgColor: fgColor)),
           _NumKey(

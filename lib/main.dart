@@ -92,6 +92,8 @@ class AppRouter extends StatelessWidget {
         child = const EditProfileScreen();
       case 'setup_pin':
         child = const PinSetupScreen();
+      case 'setup_2fa':
+        child = const TwoFactorSetupScreen();
       default:
         child = MainScaffold(currentScreen: screen);
     }

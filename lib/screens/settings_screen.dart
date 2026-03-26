@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../app_state.dart';
 import '../theme.dart';
 import '../services/translations.dart';
+import '../services/bio_service.dart';
 
 Widget _buildSimpleScreen(BuildContext context, String title, String subtitle,
     List<Widget> children) {
@@ -646,8 +647,11 @@ class PrivacyScreen extends StatelessWidget {
               fgColor: fgColor,
               mutedColor: mutedColor,
               borderColor: borderColor,
-              onTap: () {
-                state.setBiometricEnabled(!state.isBiometricEnabled);
+              onTap: () async {
+                final success = await BioService().authenticate();
+                if (success) {
+                  state.setBiometricEnabled(!state.isBiometricEnabled);
+                }
               }),
           _SettingsTile(
               icon: Icons.pin_outlined,
@@ -700,10 +704,7 @@ class PrivacyScreen extends StatelessWidget {
               mutedColor: mutedColor,
               borderColor: borderColor,
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('2FA will be available in a future update!')),
-                );
+                state.setCurrentScreen('setup_2fa');
               }),
         ]),
       ),
@@ -861,5 +862,129 @@ class _SettingsTile extends StatelessWidget {
         Divider(height: 1, color: borderColor, indent: 16),
       ]),
     );
+  }
+}
+
+class TwoFactorSetupScreen extends StatefulWidget {
+  const TwoFactorSetupScreen({super.key});
+
+  @override
+  State<TwoFactorSetupScreen> createState() => _TwoFactorSetupScreenState();
+}
+
+class _TwoFactorSetupScreenState extends State<TwoFactorSetupScreen> {
+  bool _isSuccess = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fgColor = isDark ? AppColors.darkForeground : AppColors.foreground;
+    final mutedColor =
+        isDark ? AppColors.darkMutedForeground : AppColors.mutedForeground;
+    final cardColor = isDark ? AppColors.darkCard : AppColors.card;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.border;
+
+    if (_isSuccess) {
+      return _buildSimpleScreen(context, '2FA Enabled', '', [
+        const Center(
+          child: Icon(Icons.check_circle_outline,
+              size: 80, color: AppColors.secondary),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Two-Factor Authentication is now active.',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+              fontSize: 16, fontWeight: FontWeight.w600, color: fgColor),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Your account is now more secure. You will be asked for a verification code when signing in from new devices.',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(fontSize: 13, color: mutedColor),
+        ),
+        const SizedBox(height: 32),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => state.goBack(),
+            child: const Text('Back to Security'),
+          ),
+        ),
+      ]);
+    }
+
+    return _buildSimpleScreen(context, 'Set up 2FA',
+        'Secure your account with an Authenticator app', [
+      Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
+        ),
+        child: Column(children: [
+          const Icon(Icons.phonelink_lock, size: 48, color: AppColors.primary),
+          const SizedBox(height: 16),
+          Text(
+            'Step 1: Install an Authenticator App',
+            style: GoogleFonts.inter(
+                fontSize: 14, fontWeight: FontWeight.bold, color: fgColor),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Download Google Authenticator or Authy from the App Store or Play Store.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(fontSize: 12, color: mutedColor),
+          ),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 24),
+          Text(
+            'Step 2: Scan this QR Code',
+            style: GoogleFonts.inter(
+                fontSize: 14, fontWeight: FontWeight.bold, color: fgColor),
+          ),
+          const SizedBox(height: 16),
+          // QR Code Placeholder
+          Container(
+            width: 180,
+            height: 180,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: const Center(
+              child: Icon(Icons.qr_code_2, size: 120, color: Colors.black),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Secret: JBSWY3DPEHPK3PXP', // Mock secret
+            style: GoogleFonts.jetBrainsMono(
+                fontSize: 12, fontWeight: FontWeight.bold, color: mutedColor),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Once scanned, enter the 6-digit code from your app below to verify.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(fontSize: 11, color: mutedColor),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 24),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () async {
+            await state.set2faEnabled(true);
+            setState(() => _isSuccess = true);
+          },
+          child: const Text('Verify & Enable 2FA'),
+        ),
+      ),
+    ]);
   }
 }

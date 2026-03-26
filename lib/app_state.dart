@@ -56,6 +56,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   String _pin = '';      // empty = no PIN set
   bool _isPinLocked = false; // true after app resumes if PIN is set
   bool _isBiometricEnabled = false;
+  bool _is2faEnabled = false;
   DateTime? _lastPausedTime;
 
   // Services
@@ -98,6 +99,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   bool get hasPin => _pin.isNotEmpty;
   String get pin => _pin;
   bool get isBiometricEnabled => _isBiometricEnabled;
+  bool get is2faEnabled => _is2faEnabled;
   CurrencyService get currencyService => _currencyService;
 
   AppState() {
@@ -221,6 +223,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       } catch (_) {}
     }
     _isBiometricEnabled = prefs.getBool('isBiometricEnabled') ?? false;
+    _is2faEnabled = prefs.getBool('is2faEnabled') ?? false;
     notifyListeners();
   }
 
@@ -265,6 +268,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         'isBiometricEnabled': _isBiometricEnabled,
         'displayName': _userName,
         'profileImage': _profileImage,
+        'is2faEnabled': _is2faEnabled,
       }, SetOptions(merge: true));
     }
   }
@@ -318,6 +322,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         if (data.containsKey('isBiometricEnabled')) {
           _isBiometricEnabled = data['isBiometricEnabled'];
           await prefs.setBool('isBiometricEnabled', _isBiometricEnabled);
+        }
+        if (data.containsKey('is2faEnabled')) {
+          _is2faEnabled = data['is2faEnabled'];
+          await prefs.setBool('is2faEnabled', _is2faEnabled);
         }
         if (data.containsKey('displayName')) {
           _userName = data['displayName'];
@@ -776,6 +784,12 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> setBiometricEnabled(bool enabled) async {
     _isBiometricEnabled = enabled;
+    await _savePreferences();
+    notifyListeners();
+  }
+
+  Future<void> set2faEnabled(bool enabled) async {
+    _is2faEnabled = enabled;
     await _savePreferences();
     notifyListeners();
   }
