@@ -54,6 +54,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   String _pin = '';      // empty = no PIN set
   bool _isPinLocked = false; // true after app resumes if PIN is set
   bool _isBiometricEnabled = false;
+  DateTime? _lastPausedTime;
 
   // Services
   final CurrencyService _currencyService = CurrencyService();
@@ -118,9 +119,18 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
-      if (_isLoggedIn && (_pin.isNotEmpty || _isBiometricEnabled) && !_isPinLocked) {
-        _isPinLocked = true;
-        notifyListeners();
+      _lastPausedTime = DateTime.now();
+    } else if (state == AppLifecycleState.resumed) {
+      if (_lastPausedTime != null) {
+        final now = DateTime.now();
+        final diff = now.difference(_lastPausedTime!);
+        if (diff.inSeconds >= 10) {
+          if (_isLoggedIn && (_pin.isNotEmpty || _isBiometricEnabled) && !_isPinLocked) {
+            _isPinLocked = true;
+            notifyListeners();
+          }
+        }
+        _lastPausedTime = null;
       }
     }
   }
