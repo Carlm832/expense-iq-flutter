@@ -152,57 +152,14 @@ class SettingsScreen extends StatelessWidget {
                     !state.pushNotificationsEnabled);
               }),
           _SettingsTile(
-              icon: Icons.fingerprint,
-              label: 'Biometric Security',
-              value: state.isBiometricEnabled ? 'Enabled' : 'Disabled',
+              icon: Icons.security,
+              label: 'Privacy & Security',
+              value: '',
               fgColor: fgColor,
               mutedColor: mutedColor,
               borderColor: borderColor,
               onTap: () {
-                state.setBiometricEnabled(!state.isBiometricEnabled);
-              }),
-          _SettingsTile(
-              icon: Icons.pin_outlined,
-              label: 'App PIN',
-              value: state.hasPin ? 'Enabled' : 'Disabled',
-              fgColor: fgColor,
-              mutedColor: mutedColor,
-              borderColor: borderColor,
-              onTap: () {
-                if (state.hasPin) {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Manage PIN'),
-                      content: const Text(
-                          'What would you like to do with your PIN?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            state.setCurrentScreen('setup_pin');
-                          },
-                          child: const Text('Change PIN'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            state.clearPin();
-                            Navigator.pop(ctx);
-                          },
-                          child: const Text('Remove PIN',
-                              style: TextStyle(
-                                  color: AppColors.destructive)),
-                        ),
-                      ],
-                    ),
-                  );
-                } else {
-                  state.setCurrentScreen('setup_pin');
-                }
+                state.setCurrentScreen('privacy');
               }),
           _SettingsTile(
               icon: Icons.backup_outlined,
@@ -603,34 +560,89 @@ class PrivacyScreen extends StatelessWidget {
     final cardColor = isDark ? AppColors.darkCard : AppColors.card;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.border;
     final lang = state.language;
-    return _buildSimpleScreen(context, Translations.t('privacy_title', lang),
+    return _buildSimpleScreen(context, 'Privacy & Security',
         Translations.t('data_protection', lang), [
       Container(
         decoration: BoxDecoration(
             color: cardColor,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: borderColor)),
-        padding: const EdgeInsets.all(16),
         child: Column(children: [
-          Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Biometric Authentication', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: fgColor)),
-                Text('Use Fingerprint or FaceID to unlock the app', style: GoogleFonts.inter(fontSize: 12, color: mutedColor)),
-              ]),
-            ),
-            Switch(
-              value: state.isBiometricEnabled,
-              onChanged: (v) => state.setBiometricEnabled(v),
-              activeThumbColor: AppColors.primary,
-            ),
-          ]),
-          const Divider(height: 32),
-          Text(
-            Translations.t('privacy_policy_text', lang),
-            style: GoogleFonts.inter(fontSize: 13, color: mutedColor, height: 1.6),
-          ),
+          _SettingsTile(
+              icon: Icons.fingerprint,
+              label: 'Biometric Security',
+              value: state.isBiometricEnabled ? 'Enabled' : 'Disabled',
+              fgColor: fgColor,
+              mutedColor: mutedColor,
+              borderColor: borderColor,
+              onTap: () {
+                state.setBiometricEnabled(!state.isBiometricEnabled);
+              }),
+          _SettingsTile(
+              icon: Icons.pin_outlined,
+              label: 'App PIN',
+              value: state.hasPin ? 'Enabled' : 'Disabled',
+              fgColor: fgColor,
+              mutedColor: mutedColor,
+              borderColor: borderColor,
+              onTap: () {
+                if (state.hasPin) {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Manage PIN'),
+                      content: const Text(
+                          'What would you like to do with your PIN?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            state.setCurrentScreen('setup_pin');
+                          },
+                          child: const Text('Change PIN'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            state.clearPin();
+                            Navigator.pop(ctx);
+                          },
+                          child: const Text('Remove PIN',
+                              style: TextStyle(
+                                  color: AppColors.destructive)),
+                        ),
+                      ],
+                    ),
+                  );
+                } else {
+                  state.setCurrentScreen('setup_pin');
+                }
+              }),
+          _SettingsTile(
+              icon: Icons.lock_outline,
+              label: 'Two-Factor Authentication (2FA)',
+              value: 'Coming Soon',
+              fgColor: fgColor,
+              mutedColor: mutedColor,
+              borderColor: borderColor,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('2FA will be available in a future update!')),
+                );
+              }),
         ]),
+      ),
+      const SizedBox(height: 24),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Text(
+          Translations.t('privacy_policy_text', lang),
+          style: GoogleFonts.inter(fontSize: 13, color: mutedColor, height: 1.6),
+        ),
       ),
     ]);
   }

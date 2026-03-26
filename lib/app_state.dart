@@ -293,6 +293,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
           _userName = data['displayName'];
           await prefs.setString('userName', _userName);
         }
+        if (data.containsKey('notifications')) {
+          final List<dynamic> notifs = data['notifications'];
+          _notifications = notifs.map((n) => AppNotification.fromJson(n)).toList();
+          await prefs.setString('notifications', jsonEncode(notifs));
+        }
 
         notifyListeners();
       }
@@ -474,8 +479,15 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> _saveNotifications() async {
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('notifications',
-        jsonEncode(_notifications.map((n) => n.toJson()).toList()));
+    final notifData = _notifications.map((n) => n.toJson()).toList();
+    prefs.setString('notifications', jsonEncode(notifData));
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await _db.collection('users').doc(user.uid).set({
+        'notifications': notifData,
+      }, SetOptions(merge: true));
+    }
   }
 
   // ---------------------------------------------------------------------------
