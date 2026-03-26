@@ -305,7 +305,7 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Text('ExpenseIQ v1.0.0',
+            Text('ExpenseIQ v1.0.0 @2026',
                 style: GoogleFonts.inter(fontSize: 11, color: mutedColor)),
           ]),
         ),
