@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>ExpenseIQ requires FaceID to secure your financial data and unlock the app.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ExpenseIQ needs camera access to scan your receipts for automated expense entry.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ExpenseIQ needs gallery access to upload receipt images from your photo library.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
