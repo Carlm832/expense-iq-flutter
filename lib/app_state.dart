@@ -124,7 +124,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       if (_lastPausedTime != null) {
         final now = DateTime.now();
         final diff = now.difference(_lastPausedTime!);
-        if (diff.inSeconds >= 10) {
+        if (diff.inSeconds >= 90) {
           if (_isLoggedIn && (_pin.isNotEmpty || _isBiometricEnabled) && !_isPinLocked) {
             _isPinLocked = true;
             notifyListeners();
